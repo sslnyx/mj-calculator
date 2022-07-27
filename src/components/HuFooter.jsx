@@ -27,9 +27,9 @@ const HuFooter = (props) => {
   return (
     <div className="flex">
       <button
-        className={` rounded py-2 px-5 text-white ${
+        className={`rounded py-2 px-5 text-white ${
           (hu.winner && hu.loser) || (hu.winner && hu.selfTouch)
-            ? "pointer-events-auto bg-red-600"
+            ? "bg-red-600"
             : "bg-gray-500 pointer-events-none"
         }`}
         onClick={calhandler}
