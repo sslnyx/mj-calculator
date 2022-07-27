@@ -53,7 +53,9 @@ const Home = () => {
 
       <div className="container">
         <Modal {...{ modalRef, backdropRef, closeModal }}>
-          <Hu {...{ players, setPlayers, fanPt, rounds, setRounds, closeModal }} />
+          <Hu
+            {...{ players, setPlayers, fanPt, rounds, setRounds, closeModal }}
+          />
         </Modal>
 
         <br />
@@ -62,7 +64,7 @@ const Home = () => {
         <div className="flex flex-row relative -mx-5">
           <div className="pl-5"></div>
 
-          <div className="absolute top-[24px]">
+          <div className="absolute top-[31px]">
             {new Array(rounds).fill(null)?.map((el, i) => (
               <div className="odd:bg-gray-200" onClick={delRound(i)} key={i}>
                 <Trash width={24} height={24} className="py-1 fill-red-500 " />
@@ -70,11 +72,13 @@ const Home = () => {
             ))}
           </div>
 
-          {players?.map(({ name, points }, i) => (
+          {players?.map(({ name, points, id }, i) => (
             <div key={i} className="basis-1/4">
               <div className="w-full">
                 <input
-                  className="text-center max-w-full w-full h-[24px] font-bold"
+                  className={`text-center max-w-full w-full h-[24px] font-bold mb-2 ${
+                    name.toLowerCase().includes("jac") ? "focus-visible:bg-gradient-to-br focus-visible:from-green-500 focus-visible:to-transparent focus-visible:border-green-500" : ""
+                  }`}
                   type="text"
                   defaultValue={name}
                   onChange={nameHandler(i)}
@@ -107,7 +111,7 @@ const Home = () => {
 
       <button
         onClick={modalHanlder}
-        className="fixed shadow-gray-500 shadow-md bottom-[50px] left-[50%] -translate-x-[50%] bg-sky-500 text-white w-[50px] h-[50px] flex justify-center items-center rounded-full"
+        className="fixed shadow-gray-500 shadow-md bottom-[50px] left-[50%] -translate-x-[50%] bg-sky-500 text-white w-[60px] h-[60px] flex justify-center items-center rounded-full"
       >
         <span className="text-3xl">食!</span>
       </button>

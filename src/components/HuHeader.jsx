@@ -39,12 +39,8 @@ const HuHeader = ({ hu, setHu, fan, setFan }) => {
 
       <div>
         <button
-          className={` rounded py-2 px-5 mr-3 ${
-            hu.bao
-              ? "bg-gradient-to-b from-red-500 via-yellow-500 to-blue-500 text-white"
-              : "bg-gray-200"
-          }`}
-          onClick={() => setHu({ ...hu, bao: !hu.bao })}
+          className={`rounded py-2 px-5 mr-3 ${hu.bao ? "bao" : "bg-gray-200"}`}
+          onClick={() => setHu({ ...hu, bao: !hu.bao, selfTouch: false })}
         >
           包自摸
         </button>
@@ -53,7 +49,7 @@ const HuHeader = ({ hu, setHu, fan, setFan }) => {
           className={`rounded py-2 px-5 mr-3 ${
             hu.selfTouch ? "bg-green-500 text-white" : "bg-gray-200"
           }`}
-          onClick={() => setHu({ ...hu, selfTouch: !hu.selfTouch })}
+          onClick={() => setHu({ ...hu, selfTouch: !hu.selfTouch, bao: false })}
         >
           自摸
         </button>

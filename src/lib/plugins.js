@@ -10,8 +10,8 @@ const eat = ({ players, hu, setRounds, setPlayers, rounds }) => {
         player.points[rounds] = 0;
     }
 
-    players.find(({ name }) => name === hu.winner).points[rounds] = hu.pt;
-    players.find(({ name }) => name === hu.loser).points[rounds] = -hu.pt;
+    players.find(({ id }) => id === hu.winner).points[rounds] = hu.pt;
+    players.find(({ id }) => id === hu.loser).points[rounds] = -hu.pt;
 
     localStorage.setItem("data", JSON.stringify([...players]));
     localStorage.setItem("rounds", JSON.stringify(rounds + 1));
@@ -25,16 +25,16 @@ const zimo = ({ players, hu, setRounds, setPlayers, rounds }) => {
         for (const player of players) {
             player.points[rounds] = 0;
         }
-        players.find(({ name }) => name === hu.winner).points[rounds] =
+        players.find(({ id }) => id === hu.winner).points[rounds] =
             (hu.pt / 2) * 3;
-        players.find(({ name }) => name === hu.loser).points[rounds] =
+        players.find(({ id }) => id === hu.loser).points[rounds] =
             -(hu.pt / 2) * 3;
     } else {
-        const allLosers = players.filter(({ name }) => name !== hu.winner);
+        const allLosers = players.filter(({ id }) => id !== hu.winner);
         for (const loser of allLosers) {
             loser.points[rounds] = -(hu.pt / 2);
         }
-        players.find(({ name }) => name === hu.winner).points[rounds] =
+        players.find(({ id }) => id === hu.winner).points[rounds] =
             (hu.pt / 2) * 3;
     }
 
@@ -45,4 +45,17 @@ const zimo = ({ players, hu, setRounds, setPlayers, rounds }) => {
     setPlayers(players);
 };
 
-export { fetchApi, eat, zimo }
+const resetBtns = (btnObj) => {
+    for (const btn of Object.values(btnObj)) {
+        btn?.classList.remove("active")
+    }
+}
+
+
+const setAllBtns = (btnObj) => {
+    for (const btn of Object.values(btnObj)) {
+        btn?.classList.add("active")
+    }
+}
+
+export { fetchApi, eat, zimo, resetBtns, setAllBtns }

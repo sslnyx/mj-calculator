@@ -1,16 +1,17 @@
-import React from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { eat, zimo } from "../lib/plugins";
 
 const HuFooter = (props) => {
+  const [clearing, setClearing] = useState(false);
   const { defualtData } = useOutletContext();
   const { hu, players, setPlayers, setRounds, rounds, closeModal } = props;
 
   const calhandler = () => {
-    closeModal();
-    if (hu.bao && hu.winner && hu.loser) return zimo(props);
-    if (hu.selfTouch && hu.winner) return zimo(props);
-    if (hu.winner && hu.loser && hu.winner !== hu.loser) return eat(props);
+    if (hu.bao && hu.winner && hu.loser) return zimo(props), closeModal();
+    if (hu.selfTouch && hu.winner) return zimo(props), closeModal();
+    if (hu.winner && hu.loser && hu.winner !== hu.loser)
+      return eat(props), closeModal();
   };
 
   const clearHandler = () => {
@@ -24,20 +25,43 @@ const HuFooter = (props) => {
   };
 
   return (
-    <div className="flex justify-between">
+    <div className="flex">
       <button
-        className="bg-red-500 rounded py-2 px-5 text-white"
+        className={` rounded py-2 px-5 text-white ${
+          (hu.winner && hu.loser) || (hu.winner && hu.selfTouch)
+            ? "pointer-events-auto bg-red-600"
+            : "bg-gray-500 pointer-events-none"
+        }`}
         onClick={calhandler}
       >
         計數
       </button>
 
-      <button
-        onClick={clearHandler}
-        className="bg-black text-white rounded py-2 px-5"
-      >
-        清除紀錄
-      </button>
+      <div className="flex-1"></div>
+
+      {!clearing ? (
+        <button
+          onClick={() => setClearing(true)}
+          className="bg-black text-white rounded py-2 px-5"
+        >
+          清除紀錄
+        </button>
+      ) : (
+        <div>
+          <button
+            className="bg-red-500 mr-3 text-white rounded py-2 px-5"
+            onClick={clearHandler}
+          >
+            確定清除
+          </button>
+          <button
+            className="bg-black text-white rounded py-2 px-5"
+            onClick={() => setClearing(false)}
+          >
+            取消
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import HuHeader from "./HuHeader";
 import HuFooter from "./HuFooter";
@@ -8,18 +8,24 @@ const Hu = (props) => {
   const { players, setPlayers, fanPt } = props;
   const [hu, setHu] = useState({});
   const [fan, setFan] = useState(3);
-  const winnerRef = useRef([]);
-  const loserRef = useRef([]);
+  const [loser, setLoser] = useState(players)
+  const winnerRef = useRef({});
+  const loserRef = useRef({});
 
   const containerProps = {
     winnerRef,
     loserRef,
-    players,
     setHu,
     hu,
     fanPt,
     fan,
   };
+
+  useEffect(() => {
+    // console.log(loserHandler())
+
+    setLoser(players.filter(({ id }) => id !== hu.winner))
+  }, [hu.winner]);
 
   return (
     <div>
@@ -28,13 +34,24 @@ const Hu = (props) => {
       <hr />
 
       <div className="py-5">
-        <div className="winner-container bg-green-300 p-3 rounded">
-          <WinLoseContainer {...containerProps} winnerContainer />
+        <div className="winner-container bg-sky-300 p-3 mb-3 last:mb-0 rounded">
+          <WinLoseContainer
+            {...containerProps}
+            players={players}
+            winnerContainer
+          />
         </div>
 
-        <br />
-        <div className="loser-container bg-red-300 p-3 rounded">
-          <WinLoseContainer {...containerProps} loserContainer />
+        <div
+          className={`loser-container bg-red-300 p-3 rounded ${
+            (hu.selfTouch && !hu.bao) || !hu.winner ? "hidden" : ""
+          }`}
+        >
+          <WinLoseContainer
+            {...containerProps}
+            players={loser}
+            loserContainer
+          />
         </div>
       </div>
 

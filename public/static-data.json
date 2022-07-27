@@ -2,18 +2,22 @@
   "defualtData": [
     {
       "name": "Ning",
+      "id": "p1",
       "points": []
     },
     {
       "name": "Fiona",
+      "id": "p2",
       "points": []
     },
     {
       "name": "Jacky",
+      "id": "p3",
       "points": []
     },
     {
       "name": "Vivian",
+      "id": "p4",
       "points": []
     }
   ],
