@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { eat, zimo } from "../lib/plugins";
+import { Chart } from "chart.js";
 
 const HuFooter = (props) => {
-  const [clearing, setClearing] = useState(false);
   const { defualtData } = useOutletContext();
-  const { hu, players, setPlayers, setRounds, rounds, closeModal } = props;
+  const { hu, players, setPlayers, setRounds, rounds, closeModal, charRef, clearing, setClearing  } =
+    props;
 
   const calhandler = () => {
     if (hu.bao && hu.winner && hu.loser) return zimo(props), closeModal();
@@ -17,9 +18,12 @@ const HuFooter = (props) => {
   const clearHandler = () => {
     closeModal();
     localStorage.clear();
+
     for (const player of defualtData) {
       player.points.length ? (player.points = []) : "";
     }
+
+    setClearing(false);
     setPlayers(defualtData);
     setRounds(0);
   };

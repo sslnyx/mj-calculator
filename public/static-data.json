@@ -3,22 +3,26 @@
     {
       "name": "Ning",
       "id": "p1",
-      "points": []
+      "points": [],
+      "accPoints": []
     },
     {
       "name": "Fiona",
       "id": "p2",
-      "points": []
+      "points": [],
+      "accPoints": []
     },
     {
       "name": "Jacky",
       "id": "p3",
-      "points": []
+      "points": [],
+      "accPoints": []
     },
     {
       "name": "Vivian",
       "id": "p4",
-      "points": []
+      "points": [],
+      "accPoints": []
     }
   ],
   "fanPt": {

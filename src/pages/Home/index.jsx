@@ -4,13 +4,18 @@ import { useOutletContext } from "react-router-dom";
 import Trash from "../../components/icons/Trash";
 import Hu from "../../components/Hu";
 import Modal from "../../components/Modal";
+import MjChart from "../../components/MjChart";
 
 const Home = () => {
   const { storage_players, storage_rounds, fanPt, defualtData } =
     useOutletContext();
 
+  let [theChart, setTheChart] = useState();
+
   const modalRef = useRef();
+  const charRef = useRef();
   const backdropRef = useRef();
+  const [clearing, setClearing] = useState(false);
 
   const [rounds, setRounds] = useState(storage_rounds ? storage_rounds : 0);
 
@@ -30,7 +35,6 @@ const Home = () => {
       for (const player of players) {
         player.points.splice(idx, 1);
       }
-      localStorage.setItem("data", JSON.stringify([...players]));
       localStorage.setItem("rounds", JSON.stringify(rounds - 1));
       setRounds((el) => el - 1);
       setPlayers(players);
@@ -43,18 +47,37 @@ const Home = () => {
   };
 
   const closeModal = () => {
+    clearing ? setClearing(false) : "";
     backdropRef.current.classList.remove("show", "pointer-events-auto");
     modalRef.current.classList.remove("show");
   };
+
+  useEffect(() => {
+    localStorage.setItem("data", JSON.stringify([...players]));
+  }, [players]);
 
   return (
     <div>
       {/* <small>{JSON.stringify(hu)}</small> */}
 
       <div className="container">
-        <Modal {...{ modalRef, backdropRef, closeModal }}>
+        <section className="py-5">
+          <MjChart {...{ players, setPlayers, fanPt, rounds, charRef }} />
+        </section>
+
+        <Modal {...{ modalRef, backdropRef, closeModal, setClearing }}>
           <Hu
-            {...{ players, setPlayers, fanPt, rounds, setRounds, closeModal }}
+            {...{
+              players,
+              setPlayers,
+              fanPt,
+              rounds,
+              setRounds,
+              closeModal,
+              charRef,
+              clearing,
+              setClearing,
+            }}
           />
         </Modal>
 
@@ -77,7 +100,9 @@ const Home = () => {
               <div className="w-full">
                 <input
                   className={`text-center max-w-full w-full h-[24px] font-bold mb-2 ${
-                    name.toLowerCase().includes("jac") ? "focus-visible:bg-gradient-to-br focus-visible:from-green-500 focus-visible:to-transparent focus-visible:border-green-500" : ""
+                    name.toLowerCase().includes("jac")
+                      ? "focus-visible:bg-gradient-to-br focus-visible:from-green-500 focus-visible:to-transparent focus-visible:border-green-500"
+                      : ""
                   }`}
                   type="text"
                   defaultValue={name}

@@ -5,7 +5,7 @@ import HuFooter from "./HuFooter";
 import WinLoseContainer from "./WinLoseContainer";
 
 const Hu = (props) => {
-  const { players, setPlayers, fanPt } = props;
+  const { players, setPlayers, fanPt} = props;
   const [hu, setHu] = useState({});
   const [fan, setFan] = useState(3);
   const [loser, setLoser] = useState(players)
