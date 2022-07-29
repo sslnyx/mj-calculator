@@ -28,8 +28,6 @@ const HuFooter = (props) => {
       player.name = defualtPlayers[idx]
     }
 
-    console.log(defualtData)
-
     setClearing(false);
     setPlayers([...defualtData]);
     setRounds(0);

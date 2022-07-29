@@ -53,7 +53,7 @@ const Home = () => {
 
   return (
     <div>
-      <div className="container">
+      <div className="container max-w-[420px]">
         <section className="py-5">
           <MjChart {...{ players, setPlayers, fanPt, rounds, charRef }} />
         </section>
