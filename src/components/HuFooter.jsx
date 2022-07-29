@@ -15,16 +15,23 @@ const HuFooter = (props) => {
       return eat(props), closeModal();
   };
 
+  const defualtPlayers = ["Ning", "Fiona", "Jacky", "Vivian"]
+  
+
   const clearHandler = () => {
     closeModal();
     localStorage.clear();
 
-    for (const player of defualtData) {
+    for (const [idx, player] of defualtData.entries()) {
+      // console.log(player)
       player.points.length ? (player.points = []) : "";
+      player.name = defualtPlayers[idx]
     }
 
+    console.log(defualtData)
+
     setClearing(false);
-    setPlayers(defualtData);
+    setPlayers([...defualtData]);
     setRounds(0);
   };
 

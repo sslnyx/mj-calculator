@@ -7,15 +7,13 @@ import Modal from "../../components/Modal";
 import MjChart from "../../components/MjChart";
 
 const Home = () => {
-  const { storage_players, storage_rounds, fanPt, defualtData } =
-    useOutletContext();
-
-  let [theChart, setTheChart] = useState();
+  const { storage_players, storage_rounds, fanPt, defualtData } = useOutletContext();
 
   const modalRef = useRef();
   const charRef = useRef();
   const backdropRef = useRef();
   const [clearing, setClearing] = useState(false);
+
 
   const [rounds, setRounds] = useState(storage_rounds ? storage_rounds : 0);
 
@@ -27,6 +25,7 @@ const Home = () => {
     return (ev) => {
       players[idx].name = ev.target.value;
       setPlayers([...players]);
+      localStorage.setItem("data", JSON.stringify(players));
     };
   };
 
@@ -52,14 +51,8 @@ const Home = () => {
     modalRef.current.classList.remove("show");
   };
 
-  useEffect(() => {
-    localStorage.setItem("data", JSON.stringify([...players]));
-  }, [players]);
-
   return (
     <div>
-      {/* <small>{JSON.stringify(hu)}</small> */}
-
       <div className="container">
         <section className="py-5">
           <MjChart {...{ players, setPlayers, fanPt, rounds, charRef }} />
@@ -105,7 +98,7 @@ const Home = () => {
                       : ""
                   }`}
                   type="text"
-                  defaultValue={name}
+                  value={name}
                   onChange={nameHandler(i)}
                 />
 

@@ -25,6 +25,7 @@ const eat = ({ players, hu, setRounds, setPlayers, rounds }) => {
         );
 
     localStorage.setItem("rounds", JSON.stringify(rounds + 1));
+    localStorage.setItem("data", JSON.stringify(players))
 
     setRounds((el) => el + 1);
     setPlayers(players);
@@ -68,7 +69,7 @@ const zimo = ({ players, hu, setRounds, setPlayers, rounds }) => {
     }
 
     localStorage.setItem("rounds", JSON.stringify(rounds + 1));
-
+    localStorage.setItem("data", JSON.stringify(players))
     setRounds((el) => el + 1);
     setPlayers(players);
 };

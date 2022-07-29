@@ -5,7 +5,6 @@ import { fetchApi } from "./lib/plugins";
 
 function App() {
   const [staticData, setStaticData] = useState(0);
-  
 
   const storageData = {
     storage_players: JSON.parse(localStorage.getItem("data")),
