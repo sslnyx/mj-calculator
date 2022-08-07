@@ -5,10 +5,10 @@ import HuFooter from "./HuFooter";
 import WinLoseContainer from "./WinLoseContainer";
 
 const Hu = (props) => {
-  const { players, setPlayers, fanPt} = props;
+  const { players, setPlayers, fanPt } = props;
   const [hu, setHu] = useState({});
   const [fan, setFan] = useState(3);
-  const [loser, setLoser] = useState(players)
+  const [loser, setLoser] = useState(players);
   const winnerRef = useRef({});
   const loserRef = useRef({});
 
@@ -22,9 +22,7 @@ const Hu = (props) => {
   };
 
   useEffect(() => {
-    // console.log(loserHandler())
-
-    setLoser(players.filter(({ id }) => id !== hu.winner))
+    setLoser(players.filter(({ id }) => id !== hu.winner));
   }, [hu.winner]);
 
   return (

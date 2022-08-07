@@ -1,29 +1,41 @@
 {
   "defualtData": [
     {
-      "name": "Ning",
+      "name": "P1",
       "id": "p1",
       "points": [],
       "accPoints": []
     },
     {
-      "name": "Fiona",
+      "name": "P2",
       "id": "p2",
       "points": [],
       "accPoints": []
     },
     {
-      "name": "Jacky",
+      "name": "P3",
       "id": "p3",
       "points": [],
       "accPoints": []
     },
     {
-      "name": "Vivian",
+      "name": "P4",
       "id": "p4",
       "points": [],
       "accPoints": []
     }
+  ],
+  "allPlayers": [
+    "Ning",
+    "Fiona",
+    "Jacky",
+    "Vivian",
+    "Wilson",
+    "Janet",
+    "Deming",
+    "Kelly",
+    "Henry",
+    "Queeny"
   ],
   "fanPt": {
     "3": 8,

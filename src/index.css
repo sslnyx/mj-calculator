@@ -7,7 +7,7 @@
 @layer base {
   html {
     font-family: "PT Sans Narrow", "Noto Sans TC", sans-serif;
-    @apply text-sm text-gray-700;
+    @apply text-sm text-gray-500;
   }
 
   button {

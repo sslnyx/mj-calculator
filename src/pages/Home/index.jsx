@@ -1,20 +1,25 @@
 // import React from 'react'
 import { useState, useEffect, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
-import Trash from "../../components/icons/Trash";
+import TrashCan from "../../components/icons/TrashCan";
 import Hu from "../../components/Hu";
 import Modal from "../../components/Modal";
 import MjChart from "../../components/MjChart";
+import ClearModalContent from "../../components/ClearModalContent";
+import PlayersModalContent from "../../components/PlayersModalContent";
 
 const Home = () => {
-  const { storage_players, storage_rounds, fanPt, defualtData } = useOutletContext();
+  const {
+    storage_players,
+    storage_rounds,
+    fanPt,
+    defualtData,
+    modalRef,
+    backdropRef,
+  } = useOutletContext();
 
-  const modalRef = useRef();
   const charRef = useRef();
-  const backdropRef = useRef();
   const [clearing, setClearing] = useState(false);
-
-
   const [rounds, setRounds] = useState(storage_rounds ? storage_rounds : 0);
 
   const [players, setPlayers] = useState(
@@ -40,42 +45,50 @@ const Home = () => {
     };
   };
 
-  const modalHanlder = () => {
-    modalRef.current.classList.add("show");
-    backdropRef.current.classList.add("show", "pointer-events-auto");
+  const closeModal = (id) => {
+    clearing ? setClearing(false) : "";
+    backdropRef.current[id].classList.remove("show", "pointer-events-auto");
+    modalRef.current[id].classList.remove("show");
   };
 
-  const closeModal = () => {
-    clearing ? setClearing(false) : "";
-    backdropRef.current.classList.remove("show", "pointer-events-auto");
-    modalRef.current.classList.remove("show");
+  const modalProps = {
+    modalRef,
+    backdropRef,
+    setClearing,
+    clearing,
+    closeModal,
+  };
+
+  const huProps = {
+    players,
+    setPlayers,
+    fanPt,
+    rounds,
+    setRounds,
+    charRef,
+    clearing,
+    setClearing,
+    closeModal,
   };
 
   return (
     <div>
-      <div className="container max-w-[420px]">
-        <section className="py-5">
-          <MjChart {...{ players, setPlayers, fanPt, rounds, charRef }} />
-        </section>
-
-        <Modal {...{ modalRef, backdropRef, closeModal, setClearing }}>
-          <Hu
-            {...{
-              players,
-              setPlayers,
-              fanPt,
-              rounds,
-              setRounds,
-              closeModal,
-              charRef,
-              clearing,
-              setClearing,
-            }}
-          />
+      <div className="container max-w-[420px] pt-10">
+        <Modal id="hu" {...modalProps}>
+          <Hu {...huProps} />
         </Modal>
 
-        <br />
-        <br />
+        <Modal id="mjChart" {...modalProps}>
+          <MjChart {...{ players, rounds, charRef }} />
+        </Modal>
+
+        <Modal id="clearRecord" {...modalProps}>
+          <ClearModalContent {...huProps} />
+        </Modal>
+
+        <Modal id="playersModal" {...modalProps}>
+          <PlayersModalContent {...huProps} />
+        </Modal>
 
         <div className="flex flex-row relative -mx-5">
           <div className="pl-5"></div>
@@ -83,7 +96,11 @@ const Home = () => {
           <div className="absolute top-[31px]">
             {new Array(rounds).fill(null)?.map((el, i) => (
               <div className="odd:bg-gray-200" onClick={delRound(i)} key={i}>
-                <Trash width={24} height={24} className="py-1 fill-red-500 " />
+                <TrashCan
+                  width={24}
+                  height={24}
+                  className="py-1 fill-red-500 "
+                />
               </div>
             ))}
           </div>
@@ -126,13 +143,6 @@ const Home = () => {
 
         <div className="mb-10"></div>
       </div>
-
-      <button
-        onClick={modalHanlder}
-        className="fixed shadow-gray-500 shadow-md bottom-[50px] left-[50%] -translate-x-[50%] bg-sky-500 text-white w-[60px] h-[60px] flex justify-center items-center rounded-full"
-      >
-        <span className="text-3xl">食!</span>
-      </button>
     </div>
   );
 };
