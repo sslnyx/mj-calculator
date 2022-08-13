@@ -38,7 +38,7 @@ const WinLoseContainer = ({
 
   return (
     <>
-      <h3 className="mb-3 text-center font-bold text-xl">
+      <h3 className="text-center font-bold text-xl">
         {winnerContainer && !hu.winner && hu.selfTouch
           ? "邊個自摸？"
           : winnerContainer && !hu.winner && hu.bao
@@ -53,19 +53,20 @@ const WinLoseContainer = ({
           : "出銃"}
       </h3>
 
-      <div className="flex justify-center">
+      <div className="flex flex-wrap justify-center">
         {players?.map(({ name, id }, i) => (
-          <button
-            ref={(el) =>
-              winnerContainer
-                ? (winnerRef.current[id] = el)
-                : (loserRef.current[id] = el)
-            }
-            className="py-1 px-4 bg-white mr-3 last:mr-0 rounded text-neutral-800 font-bold"
-            key={i}
-            onClick={huHandler(id, id)}
-          >
-            {name}
+          <button className="font-bold basis-1/2 p-1" key={i}>
+            <div
+              ref={(el) =>
+                winnerContainer
+                  ? (winnerRef.current[id] = el)
+                  : (loserRef.current[id] = el)
+              }
+              onClick={huHandler(id, id)}
+              className="text-neutral-800 py-1 px-4 bg-white rounded"
+            >
+              {name}
+            </div>
           </button>
         ))}
       </div>

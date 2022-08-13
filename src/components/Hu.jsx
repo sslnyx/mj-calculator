@@ -28,9 +28,8 @@ const Hu = (props) => {
   return (
     <div>
       <HuHeader {...{ hu, setHu, fan, setFan, setPlayers }} />
-      <br />
+      <div className="mb-5"></div>
       <hr />
-
       <div className="py-5">
         <div className="winner-container bg-sky-300 p-3 mb-3 last:mb-0 rounded">
           <WinLoseContainer
@@ -54,8 +53,7 @@ const Hu = (props) => {
       </div>
 
       <hr />
-      <br />
-
+      <div className="mb-5"></div>
       <HuFooter {...{ hu }} {...props} />
     </div>
   );

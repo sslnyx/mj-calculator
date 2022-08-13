@@ -17,18 +17,35 @@ const HuHeader = ({ hu, setHu, fan, setFan }) => {
       : "";
   };
 
+  const fanCn = [
+    null,
+    null,
+    null,
+    "參",
+    "肆",
+    "伍",
+    "陸",
+    "柒",
+    "捌",
+    "玖",
+    "拾",
+    "拾壹",
+    "拾貳",
+    "拾參",
+  ];
+
   return (
     <div className="flex items-center">
       <div className="flex items-center">
         <button
-          className="w-[25px] h-[25px] bg-red-500 rounded-full text-white"
+          className="w-[35px] h-[35px] bg-red-500 rounded-full text-white"
           onClick={() => fanHandler("-")}
         >
           -
         </button>
-        <span className="px-5 font-bold text-2xl">{fan}</span>
+        <span className="px-2 font-bold text-2xl w-[80px] text-center">{fanCn[fan]}番</span>
         <button
-          className="w-[25px] h-[25px] mr-3 bg-green-500 rounded-full text-white"
+          className="w-[35px] h-[35px] mr-3 bg-green-500 rounded-full text-white"
           onClick={() => fanHandler("+")}
         >
           +
@@ -39,14 +56,14 @@ const HuHeader = ({ hu, setHu, fan, setFan }) => {
 
       <div>
         <button
-          className={`rounded py-2 px-5 mr-3 ${hu.bao ? "bao" : "bg-gray-200"}`}
+          className={`rounded py-1 px-2 mr-3 ${hu.bao ? "bao" : "bg-gray-200"}`}
           onClick={() => setHu({ ...hu, bao: !hu.bao, selfTouch: false })}
         >
           包自摸
         </button>
 
         <button
-          className={`rounded py-2 px-5 mr-3 ${
+          className={`rounded py-1 px-2 mr-3 ${
             hu.selfTouch ? "bg-green-500 text-white" : "bg-gray-200"
           }`}
           onClick={() => setHu({ ...hu, selfTouch: !hu.selfTouch, bao: false })}

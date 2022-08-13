@@ -93,13 +93,13 @@ const Home = () => {
         <div className="flex flex-row relative -mx-5 text-2xl">
           <div className="pl-5"></div>
 
-          <div className="absolute top-[33px]">
+          <div className="absolute top-[39px]">
             {new Array(rounds).fill(null)?.map((el, i) => (
               <div className="odd:bg-gray-200" onClick={delRound(i)} key={i}>
                 <TrashCan
                   width={24}
-                  height={24}
-                  className="py-1 fill-red-500 "
+                  height={28}
+                  className="py-1 fill-red-500"
                 />
               </div>
             ))}
@@ -109,7 +109,7 @@ const Home = () => {
             <div key={i} className="basis-1/4">
               <div className="w-full">
                 <input
-                  className={`text-center max-w-full w-full h-[24px] font-bold mb-2 ${
+                  className={`text-center max-w-full w-full font-bold mb-3 ${
                     name.toLowerCase().includes("jac")
                       ? "focus-visible:bg-gradient-to-br focus-visible:from-green-500 focus-visible:to-transparent focus-visible:border-green-500"
                       : ""
@@ -122,9 +122,15 @@ const Home = () => {
                 {points?.map((pt, i) => (
                   <div
                     key={i}
-                    className="text-center even:bg-gray-200 h-[24px] flex justify-center items-center"
+                    className="text-center even:bg-gray-200 h-[28px] flex justify-center items-center"
                   >
-                    <span>{pt}</span>
+                    <span
+                      className={
+                        pt < 0 ? "text-red-500" : pt > 0 ? "text-green-500" : ""
+                      }
+                    >
+                      {pt}
+                    </span>
                   </div>
                 ))}
 
@@ -133,7 +139,13 @@ const Home = () => {
                 <hr />
                 <div className="mb-3"></div>
 
-                <div className="text-center">
+                <div
+                  className={`text-center font-bold text-3xl ${
+                    points?.reduce((acc, pt) => acc + pt, 0) < 0
+                      ? "text-red-500"
+                      : "text-green-500"
+                  }`}
+                >
                   {points?.reduce((acc, pt) => acc + pt, 0)}
                 </div>
               </div>
