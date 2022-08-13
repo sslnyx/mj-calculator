@@ -90,10 +90,10 @@ const Home = () => {
           <PlayersModalContent {...huProps} />
         </Modal>
 
-        <div className="flex flex-row relative -mx-5">
+        <div className="flex flex-row relative -mx-5 text-2xl">
           <div className="pl-5"></div>
 
-          <div className="absolute top-[31px]">
+          <div className="absolute top-[33px]">
             {new Array(rounds).fill(null)?.map((el, i) => (
               <div className="odd:bg-gray-200" onClick={delRound(i)} key={i}>
                 <TrashCan

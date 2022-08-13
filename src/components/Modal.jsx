@@ -20,7 +20,7 @@ const Modal = ({ children, modalRef, backdropRef, id, closeModal }) => {
 
       <div
         ref={(el) => (modalRef.current[id] = el)}
-        className="modal fade fixed top-0 left-0 w-full h-full outline-none overflow-x-hidden overflow-y-auto"
+        className="modal fade fixed top-0 left-0 w-full h-full outline-none overflow-x-hidden overflow-y-auto text-2xl"
         tabIndex="-1"
         aria-labelledby="exampleModalCenterTitle"
         aria-modal="true"

@@ -28,15 +28,16 @@ const PlayersModalContent = ({ players, setPlayers }) => {
     <div className="text-center">
       <div className="border p-3 rounded">
         <h2 className="mb-3">邊個玩緊?</h2>
-        <div className="flex justify-center">
+        <div className="flex justify-center flex-wrap">
           {players.map(({ name, id }) => (
-            <button
-              key={id}
-              ref={(el) => (activePlayersRef.current[id] = el)}
-              onClick={(ev) => removePlayer(id, ev)}
-              className="bg-sky-500 py-2 px-5 rounded text-white mr-3 last:mr-0"
-            >
-              {name}
+            <button key={id} className="p-1 text-white last:mr-0 basis-1/2">
+              <div
+                className="py-2 px-5 bg-sky-500 rounded"
+                ref={(el) => (activePlayersRef.current[id] = el)}
+                onClick={(ev) => removePlayer(id, ev)}
+              >
+                {name}
+              </div>
             </button>
           ))}
         </div>
