@@ -73,7 +73,7 @@ const Home = () => {
 
   return (
     <div>
-      <div className="container max-w-[420px] pt-10">
+      <div className="container max-w-[420px] pt-10 h-[560px] overflow-y-scroll">
         <Modal id="hu" {...modalProps}>
           <Hu {...huProps} />
         </Modal>
