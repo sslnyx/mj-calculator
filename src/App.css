@@ -821,10 +821,10 @@ body {
    ============================================ */
 
 .game-room {
-  min-height: 100vh;
+  min-height: 100svh;
   width: 100%;
   background: var(--gray-100);
-  padding-bottom: 100px;
+  /* padding-bottom: 100px; */
 }
 
 .game-room.loading,
@@ -2246,6 +2246,7 @@ body {
     margin-top: var(--spacing-lg);
     /* min-height: calc(100vh - var(--spacing-xl) * 2); */
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+
   }
 }
 
