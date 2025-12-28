@@ -22,7 +22,7 @@ const HAND_PATTERNS = {
         { id: 'jiu_lian_bao_deng', name: '九蓮寶燈', fan: 13, isLimit: true, hasBao: false },
         { id: 'da_si_xi', name: '大四喜', fan: 13, isLimit: true, hasBao: true },
         { id: 'da_san_yuan', name: '大三元', fan: 13, isLimit: true, hasBao: true },
-        { id: 'zi_yi_se', name: '字一色', fan: 13, isLimit: true, hasBao: false },
+        { id: 'zi_yi_se', name: '字一色', fan: 13, isLimit: true, hasBao: true },
         { id: 'kan_kan_hu', name: '坎坎胡', fan: 13, isLimit: true, hasBao: false },
     ],
     // Bonus conditions (add-ons)
@@ -70,8 +70,13 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
         // Add fanZiCount
         total += fanZiCount
 
+        // Add +1 fan bonus for zi-mo (自摸) or bao zi-mo (包自摸)
+        if (winType === 'zimo' || winType === 'zimo_bao') {
+            total += 1
+        }
+
         return Math.min(total, 13)
-    }, [selectedPatterns, fanZiCount])
+    }, [selectedPatterns, fanZiCount, winType])
 
     // Sync fan count when patterns change
     const effectiveFan = calculatedFan !== null ? calculatedFan : fanCount
@@ -170,70 +175,94 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
     }
 
     return (
-        <div className="modal-overlay" onClick={handleClose}>
-            <div className="modal-content hu-modal" onClick={e => e.stopPropagation()}>
+        <div
+            className="fixed inset-0 bg-black/70 flex items-end justify-center z-[100]"
+            onClick={handleClose}
+        >
+            <div
+                className="bg-white w-full max-w-[400px] max-h-[90vh] rounded-t-2xl border-t-4 border-x-4 border-black flex flex-col relative"
+                onClick={e => e.stopPropagation()}
+            >
                 {/* Close Button */}
-                <button className="modal-close" onClick={handleClose}>×</button>
+                <button
+                    className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-gray-100 border-2 border-black rounded-full text-lg font-bold cursor-pointer hover:bg-red hover:text-white z-10"
+                    onClick={handleClose}
+                >
+                    ×
+                </button>
 
                 {/* Header */}
-                <h2 className="hu-modal-title">RECORD WIN</h2>
+                <h2 className="font-title text-2xl text-center py-4 border-b-[3px] border-black bg-yellow shrink-0">
+                    RECORD WIN
+                </h2>
 
-                <div className="modal-body">
-                    {error && <div className="modal-error">{error}</div>}
+                {/* Scrollable Body */}
+                <div className="flex-1 scroll-section p-4 space-y-4">
+                    {error && (
+                        <div className="bg-red text-white p-2 rounded-md text-sm font-bold text-center">
+                            {error}
+                        </div>
+                    )}
 
                     {/* Winner Selection */}
-                    <div className="form-group">
-                        <label>WHO WON?</label>
-                        <div className="player-grid-2x2">
+                    <div>
+                        <label className="block font-bold text-sm mb-2 uppercase">WHO WON?</label>
+                        <div className="grid grid-cols-2 gap-2">
                             {players.map(p => (
                                 <button
                                     key={p.player_id}
-                                    className={`player-btn ${winnerId === p.player_id ? 'selected winner' : ''}`}
+                                    className={`py-3 px-2 rounded-lg border-comic-thin font-bold text-sm transition-all ${winnerId === p.player_id
+                                        ? 'bg-green shadow-comic-sm scale-105'
+                                        : 'bg-white hover:bg-gray-100'
+                                        }`}
                                     onClick={() => setWinnerId(p.player_id)}
                                 >
-                                    <span className="player-name">{getShortName(p.player)}</span>
+                                    {getShortName(p.player)}
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     {/* Win Type Toggle - 3 tabs */}
-                    <div className="form-group">
-                        <div className="win-type-toggle three-tabs">
-                            <button
-                                className={`toggle-btn ${winType === 'eat' ? 'active' : ''}`}
-                                onClick={() => { setWinType('eat'); setLoserId(null) }}
-                            >
-                                点炮
-                            </button>
-                            <button
-                                className={`toggle-btn ${winType === 'zimo' ? 'active' : ''}`}
-                                onClick={() => { setWinType('zimo'); setLoserId(null) }}
-                            >
-                                自摸
-                            </button>
-                            <button
-                                className={`toggle-btn ${winType === 'zimo_bao' ? 'active' : ''}`}
-                                onClick={() => { setWinType('zimo_bao'); setLoserId(null) }}
-                            >
-                                包自摸
-                            </button>
+                    <div>
+                        <div className="grid grid-cols-3 gap-1 bg-gray-200 p-1 rounded-lg">
+                            {[
+                                { type: 'eat', label: '点炮' },
+                                { type: 'zimo', label: '自摸' },
+                                { type: 'zimo_bao', label: '包自摸' }
+                            ].map(({ type, label }) => (
+                                <button
+                                    key={type}
+                                    className={`py-2 rounded-md font-bold text-sm transition-all ${winType === type
+                                        ? 'bg-orange shadow-comic-sm'
+                                        : 'bg-transparent hover:bg-white/50'
+                                        }`}
+                                    onClick={() => { setWinType(type); setLoserId(null) }}
+                                >
+                                    {label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
                     {/* Loser Selection (for eat) */}
                     {winType === 'eat' && (
-                        <div className="form-group">
-                            <label>WHO DEALT IN?</label>
-                            <div className="player-grid-2x2">
+                        <div>
+                            <label className="block font-bold text-sm mb-2 uppercase">WHO DEALT IN?</label>
+                            <div className="grid grid-cols-2 gap-2">
                                 {players.map(p => (
                                     <button
                                         key={p.player_id}
-                                        className={`player-btn ${loserId === p.player_id ? 'selected loser' : ''} ${p.player_id === winnerId ? 'disabled' : ''}`}
+                                        className={`py-3 px-2 rounded-lg border-comic-thin font-bold text-sm transition-all ${loserId === p.player_id
+                                            ? 'bg-red text-white shadow-comic-sm'
+                                            : p.player_id === winnerId
+                                                ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                                                : 'bg-white hover:bg-gray-100'
+                                            }`}
                                         onClick={() => p.player_id !== winnerId && setLoserId(p.player_id)}
                                         disabled={p.player_id === winnerId}
                                     >
-                                        <span className="player-name">{getShortName(p.player)}</span>
+                                        {getShortName(p.player)}
                                     </button>
                                 ))}
                             </div>
@@ -242,37 +271,44 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
 
                     {/* Bao player selection (for zimo_bao) */}
                     {winType === 'zimo_bao' && (
-                        <div className="form-group">
-                            <label>WHO IS 包?</label>
-                            <div className="player-grid-2x2">
+                        <div>
+                            <label className="block font-bold text-sm mb-2 uppercase">WHO IS 包?</label>
+                            <div className="grid grid-cols-2 gap-2">
                                 {players.map(p => (
                                     <button
                                         key={p.player_id}
-                                        className={`player-btn ${loserId === p.player_id ? 'selected loser' : ''} ${p.player_id === winnerId ? 'disabled' : ''}`}
+                                        className={`py-3 px-2 rounded-lg border-comic-thin font-bold text-sm transition-all ${loserId === p.player_id
+                                            ? 'bg-red text-white shadow-comic-sm'
+                                            : p.player_id === winnerId
+                                                ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                                                : 'bg-white hover:bg-gray-100'
+                                            }`}
                                         onClick={() => p.player_id !== winnerId && setLoserId(p.player_id)}
                                         disabled={p.player_id === winnerId}
                                     >
-                                        <span className="player-name">{getShortName(p.player)}</span>
+                                        {getShortName(p.player)}
                                     </button>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Hand Pattern Selection - Always Visible with Tabs */}
-                    <div className="form-group">
-                        <label>牌型 (Hand Patterns)</label>
+                    {/* Hand Pattern Selection */}
+                    <div>
+                        <label className="block font-bold text-sm mb-2 uppercase">牌型 (Hand Patterns)</label>
 
                         {/* Tabs for Regular / Limit */}
-                        <div className="pattern-tabs">
+                        <div className="flex gap-1 mb-2">
                             <button
-                                className={`pattern-tab ${patternTab === 'regular' ? 'active' : ''}`}
+                                className={`flex-1 py-2 rounded-md font-bold text-sm border-comic-thin transition-all ${patternTab === 'regular' ? 'bg-cyan' : 'bg-white hover:bg-gray-100'
+                                    }`}
                                 onClick={() => setPatternTab('regular')}
                             >
                                 常規
                             </button>
                             <button
-                                className={`pattern-tab ${patternTab === 'limit' ? 'active' : ''}`}
+                                className={`flex-1 py-2 rounded-md font-bold text-sm border-comic-thin transition-all ${patternTab === 'limit' ? 'bg-pink' : 'bg-white hover:bg-gray-100'
+                                    }`}
                                 onClick={() => setPatternTab('limit')}
                             >
                                 爆棚
@@ -280,57 +316,60 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                         </div>
 
                         {/* Pattern Grid based on active tab */}
-                        <div className="pattern-section">
-                            {patternTab === 'regular' && (
-                                <div className="pattern-grid">
-                                    {HAND_PATTERNS.regular.map(p => (
-                                        <button
-                                            key={p.id}
-                                            className={`pattern-btn ${selectedPatterns.includes(p.id) ? 'selected' : ''}`}
-                                            onClick={() => handlePatternToggle(p.id)}
-                                        >
-                                            {p.name} <span className="pattern-fan">+{p.fan}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
-                            {patternTab === 'limit' && (
-                                <div className="pattern-grid">
-                                    {HAND_PATTERNS.limit.map(p => (
-                                        <button
-                                            key={p.id}
-                                            className={`pattern-btn limit ${selectedPatterns.includes(p.id) ? 'selected' : ''} ${isLimitDisabled(p) ? 'disabled-pattern' : ''}`}
-                                            onClick={() => !isLimitDisabled(p) && handlePatternToggle(p.id)}
-                                            disabled={isLimitDisabled(p)}
-                                            title={isLimitDisabled(p) ? '此牌型不適用包' : ''}
-                                        >
-                                            {p.name}
-                                            {p.hasBao && <span className="bao-indicator">包</span>}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                            {patternTab === 'regular' && HAND_PATTERNS.regular.map(p => (
+                                <button
+                                    key={p.id}
+                                    className={`py-2 px-1 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes(p.id)
+                                        ? 'bg-cyan shadow-comic-sm'
+                                        : 'bg-white hover:bg-gray-100'
+                                        }`}
+                                    onClick={() => handlePatternToggle(p.id)}
+                                >
+                                    {p.name} <span className="text-gray-500">+{p.fan}</span>
+                                </button>
+                            ))}
+                            {patternTab === 'limit' && HAND_PATTERNS.limit.map(p => (
+                                <button
+                                    key={p.id}
+                                    className={`py-2 px-1 rounded-md border-comic-thin text-xs font-bold transition-all relative ${selectedPatterns.includes(p.id)
+                                        ? 'bg-pink shadow-comic-sm'
+                                        : isLimitDisabled(p)
+                                            ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                                            : 'bg-white hover:bg-gray-100'
+                                        }`}
+                                    onClick={() => !isLimitDisabled(p) && handlePatternToggle(p.id)}
+                                    disabled={isLimitDisabled(p)}
+                                    title={isLimitDisabled(p) ? '此牌型不適用包' : ''}
+                                >
+                                    {p.name}
+                                    {p.hasBao && (
+                                        <span className="absolute -top-1 -right-1 bg-red text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center border border-black">
+                                            包
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
                         </div>
 
                         {/* Bonus / Add-ons */}
-                        <div className="pattern-group addon-group">
-                            <span className="pattern-group-label">附加</span>
+                        <div className="bg-gray-100 rounded-lg p-3">
+                            <span className="text-xs font-bold text-gray-500 mb-2 block">附加</span>
 
-                            {/* 番子 Counter - Always visible */}
-                            <div className="fanzi-counter">
-                                <span className="fanzi-label">番子</span>
-                                <div className="counter-controls">
+                            {/* 番子 Counter */}
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold text-sm">番子</span>
+                                <div className="flex items-center gap-2">
                                     <button
-                                        className="counter-btn"
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
                                         onClick={() => setFanZiCount(prev => Math.max(0, prev - 1))}
                                         disabled={fanZiCount === 0}
                                     >
                                         ◀
                                     </button>
-                                    <span className="counter-value">{fanZiCount}</span>
+                                    <span className="w-6 text-center font-title text-lg">{fanZiCount}</span>
                                     <button
-                                        className="counter-btn"
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
                                         onClick={() => setFanZiCount(prev => Math.min(4, prev + 1))}
                                         disabled={fanZiCount === 4}
                                     >
@@ -341,24 +380,27 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
 
                             {/* Rare add-ons - Collapsible */}
                             <button
-                                className="rare-addons-toggle"
+                                className="w-full text-left text-xs font-bold text-gray-500 flex items-center gap-1"
                                 onClick={() => setShowRareAddons(!showRareAddons)}
                             >
                                 其他附加 {showRareAddons ? '▲' : '▼'}
                                 {selectedPatterns.some(id => ['wu_hua', 'qiang_gang', 'gang_shang_hua', 'hai_di_lao_yue'].includes(id)) && (
-                                    <span className="addon-active-dot">•</span>
+                                    <span className="text-orange">•</span>
                                 )}
                             </button>
 
                             {showRareAddons && (
-                                <div className="pattern-grid addon-grid rare-addons">
+                                <div className="grid grid-cols-2 gap-2 mt-2">
                                     {HAND_PATTERNS.bonus.filter(p => p.id !== 'fan_zi').map(p => (
                                         <button
                                             key={p.id}
-                                            className={`pattern-btn bonus ${selectedPatterns.includes(p.id) ? 'selected' : ''}`}
+                                            className={`py-2 px-2 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes(p.id)
+                                                ? 'bg-yellow shadow-comic-sm'
+                                                : 'bg-white hover:bg-gray-100'
+                                                }`}
                                             onClick={() => handlePatternToggle(p.id)}
                                         >
-                                            {p.name} <span className="pattern-fan">+{p.fan}</span>
+                                            {p.name} <span className="text-gray-500">+{p.fan}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -367,24 +409,29 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                     </div>
 
                     {/* Fan Selection */}
-                    <div className="form-group">
-                        <label>
-                            番 (FAN)
-                            <span className="fan-points-display">{getPointsDisplay()}</span>
+                    <div>
+                        <label className="block font-bold text-sm mb-2 uppercase flex justify-between items-center">
+                            <span>番 (FAN)</span>
+                            <span className="text-orange font-title text-base">{getPointsDisplay()}</span>
                         </label>
-                        <div className="fan-grid extended">
+                        <div className="grid grid-cols-7 gap-1">
                             {FAN_OPTIONS.map(fan => (
                                 <button
                                     key={fan}
-                                    className={`fan-btn ${effectiveFan === fan ? 'selected' : ''} ${calculatedFan !== null && fan !== calculatedFan ? 'dimmed' : ''}`}
-                                    onClick={() => { setFanCount(fan); setSelectedPatterns([]); }}
+                                    className={`py-2 rounded border-comic-thin font-title text-lg transition-all ${effectiveFan === fan
+                                        ? 'bg-orange shadow-comic-sm'
+                                        : calculatedFan !== null && fan !== calculatedFan
+                                            ? 'bg-gray-100 opacity-40'
+                                            : 'bg-white hover:bg-gray-100'
+                                        }`}
+                                    onClick={() => { setFanCount(fan); setSelectedPatterns([]); setFanZiCount(0) }}
                                 >
                                     {fan}
                                 </button>
                             ))}
                         </div>
                         {calculatedFan !== null && (
-                            <div className="fan-auto-hint">
+                            <div className="text-xs text-gray-500 mt-1 text-center">
                                 ⓘ Auto-calculated from patterns. Tap a number to override.
                             </div>
                         )}
@@ -393,7 +440,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
 
                 {/* Submit Button */}
                 <button
-                    className="confirm-btn"
+                    className="m-4 py-4 bg-green border-comic-thick rounded-xl font-title text-xl shadow-comic-md transition-all hover:-translate-y-0.5 hover:shadow-comic-lg active:translate-y-0.5 active:shadow-comic-sm disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
                 >

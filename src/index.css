@@ -1,77 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  max-height: 100svh;
-  overflow: hidden;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-
-button:hover {
-  border-color: #646cff;
-}
-
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@layer base {
+  * {
+    box-sizing: border-box;
   }
 
-  a:hover {
-    color: #747bff;
+  html,
+  body,
+  #root {
+    height: 100svh;
+    max-height: 100svh;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    @apply flex items-center justify-center w-full;
   }
 
-  button {
-    background-color: #f9f9f9;
+  body {
+    font-family: 'Comic Neue', cursive;
+    background: #202020;
+    color: #000000;
+    /* Prevent pull-to-refresh on mobile Chrome */
+    overscroll-behavior: none;
+    touch-action: pan-x pan-y;
+  }
+}
+
+@layer components {
+
+  /* App Container - Mobile first, centered on desktop */
+  .app-container {
+    @apply h-[100svh] w-full mx-auto bg-orange relative overflow-hidden;
+  }
+
+  /* Desktop: Fixed aspect ratio container */
+  @media (min-width: 480px) {
+    .app-container {
+      @apply aspect-[9/16] h-[800px] w-auto rounded-xl;
+      box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  /* Loading spinner */
+  .loading-spinner {
+    @apply w-[60px] h-[60px] border-4 border-black border-t-yellow rounded-full animate-spin;
+  }
+
+  /* Comic-style border utilities */
+  .border-comic-thin {
+    @apply border-2 border-black;
+  }
+
+  .border-comic-medium {
+    @apply border-[3px] border-black;
+  }
+
+  .border-comic-thick {
+    @apply border-4 border-black;
+  }
+
+  /* Scrollable section (for use inside locked-height pages) */
+  .scroll-section {
+    @apply overflow-y-auto overflow-x-hidden overscroll-contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@layer utilities {
+
+  /* Prevent overscroll/bounce */
+  .no-overscroll {
+    overscroll-behavior: none;
+  }
+
+  /* Text shadows for comic effect */
+  .text-shadow-comic {
+    text-shadow:
+      4px 4px 0 #FF9E00,
+      -2px -2px 0 #000000,
+      2px -2px 0 #000000,
+      -2px 2px 0 #000000;
+  }
+
+  .text-shadow-cyan {
+    text-shadow: 3px 3px 0 #00CCFF, -1px -1px 0 #000000;
+  }
+
+  /* White text stroke for power labels */
+  .text-stroke-white {
+    -webkit-text-stroke: 2px white;
+    paint-order: stroke fill;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
   }
 }

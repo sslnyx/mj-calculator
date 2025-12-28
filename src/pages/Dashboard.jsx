@@ -147,7 +147,7 @@ const Dashboard = () => {
 
     if (loading) {
         return (
-            <div className="dashboard-container">
+            <div className="h-[100svh] flex items-center justify-center bg-gray-100">
                 <div className="loading-spinner"></div>
             </div>
         )
@@ -179,37 +179,50 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="dashboard-container">
-            <header className="dashboard-header">
-                <div className="user-info">
+        <div className="h-[100svh] bg-gray-100 flex flex-col overflow-hidden">
+            {/* Header */}
+            <header className="bg-yellow border-b-[3px] border-black p-6 pt-8 flex justify-between items-start gap-4 shrink-0">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
                     {player?.avatar_url && (
                         <img
                             src={player.avatar_url}
                             alt={player.display_name}
-                            className="user-avatar"
+                            className="w-[60px] h-[60px] rounded-full border-comic-medium shadow-comic-sm shrink-0"
                         />
                     )}
-                    <div className="user-details">
-                        <h2>{getFirstName(player?.display_name)}</h2>
+                    <div className="min-w-0 flex-1">
+                        <h2 className="font-title text-xl m-0 flex items-center gap-2 flex-wrap">
+                            {getFirstName(player?.display_name)}
+                        </h2>
                     </div>
                 </div>
-                <button className="logout-btn" onClick={signOut}>
+                <button
+                    className="bg-white border-comic-thin py-2 px-4 rounded-md font-bold text-xs cursor-pointer shadow-comic-sm uppercase shrink-0 hover:bg-gray-100"
+                    onClick={signOut}
+                >
                     Sign Out
                 </button>
             </header>
 
+            {/* Error Banner */}
             {error && (
-                <div className="error-banner">
-                    {error}
-                    <button onClick={() => setError(null)}>×</button>
+                <div className="bg-red text-white p-3 flex justify-between items-center border-b-2 border-black">
+                    <span className="font-bold">{error}</span>
+                    <button
+                        className="bg-transparent border-none text-white text-xl cursor-pointer"
+                        onClick={() => setError(null)}
+                    >
+                        ×
+                    </button>
                 </div>
             )}
 
-            <main className="dashboard-main">
+            {/* Main Content - Scrollable */}
+            <main className="flex-1 pt-8 flex flex-col overflow-hidden pb-20">
                 {/* Create Table Button */}
-                <section className="create-table-section">
+                <section className="mb-8 shrink-0 px-6">
                     <button
-                        className="create-table-btn"
+                        className="w-full p-6 bg-cyan border-comic-medium rounded-lg font-title text-2xl font-bold cursor-pointer shadow-comic-lg uppercase transition-all duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:-rotate-1 hover:shadow-[8px_8px_0px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[2px_2px_0px_0px_#000000] disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
                         onClick={handleCreateTable}
                         disabled={isCreating}
                     >
@@ -217,74 +230,88 @@ const Dashboard = () => {
                     </button>
                 </section>
 
-                {/* Active Tables */}
-                <section className="active-tables-section">
-                    <h3>Active Tables</h3>
+                {/* Active Tables - Scrollable Section */}
+                <section className="flex-1 flex flex-col">
+                    <div className="px-6">
+
+                        <h3 className="font-title text-xl mb-4 flex items-center gap-2 shrink-0">
+                            <span className="flex items-center justify-center w-7 h-7 bg-black text-white rounded-sm text-sm shadow-[2px_2px_0_#888888]">#</span>
+                            Active Tables
+                        </h3>
+                    </div>
+
                     {activeTables.length === 0 ? (
-                        <div className="no-tables">
-                            <p>No active tables</p>
-                            <p className="hint">Create a new table to start playing!</p>
+                        <div className="text-center p-8 bg-white border-comic-thin rounded-lg border-dashed">
+                            <p className="m-0 font-bold">No active tables</p>
+                            <p className="text-gray-500 text-sm mt-2">Create a new table to start playing!</p>
                         </div>
                     ) : (
-                        <div className="tables-list">
-                            {activeTables.map(table => (
-                                <div key={table.id} className="table-card">
-                                    <div className="table-info">
-                                        <div className="table-code">{table.room_code}</div>
-                                        <div className="table-players">
-                                            {table.room_players?.map((rp, i) => (
-                                                rp.player?.avatar_url ? (
-                                                    <img
-                                                        key={i}
-                                                        src={rp.player.avatar_url}
-                                                        alt=""
-                                                        className="player-mini-avatar"
-                                                        title={rp.player?.display_name}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        key={i}
-                                                        className="player-mini-avatar placeholder"
-                                                        title={rp.player?.display_name}
-                                                    >
-                                                        {rp.player?.display_name?.[0] || '?'}
-                                                    </div>
-                                                )
-                                            ))}
-                                            <span className="player-count">
-                                                {table.room_players?.length || 0}/4
-                                            </span>
+                        <div className="flex-1 scroll-section px-6">
+                            <div className="flex flex-col gap-4">
+                                {activeTables.map((table, index) => (
+                                    <div
+                                        key={table.id}
+                                        className={`bg-white border-comic-medium rounded-lg p-4 shadow-comic-md flex justify-between items-center transition-all duration-150 hover:rotate-0 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-comic-lg ${index % 2 === 0 ? '-rotate-[0.5deg]' : 'rotate-[0.5deg]'
+                                            }`}
+                                    >
+                                        <div className="flex flex-col gap-1">
+                                            <div className="font-title text-2xl font-bold">{table.room_code}</div>
+                                            <div className="flex items-center gap-1">
+                                                {table.room_players?.map((rp, i) => (
+                                                    rp.player?.avatar_url ? (
+                                                        <img
+                                                            key={i}
+                                                            src={rp.player.avatar_url}
+                                                            alt=""
+                                                            className="w-6 h-6 rounded-full border-2 border-black -ml-1.5 first:ml-0"
+                                                            title={rp.player?.display_name}
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            key={i}
+                                                            className="w-6 h-6 rounded-full border-2 border-black -ml-1.5 first:ml-0 flex items-center justify-center bg-gray-200 text-[10px] font-bold"
+                                                            title={rp.player?.display_name}
+                                                        >
+                                                            {rp.player?.display_name?.[0] || '?'}
+                                                        </div>
+                                                    )
+                                                ))}
+                                                <span className="text-xs font-bold text-gray-500 ml-1">
+                                                    {table.room_players?.length || 0}/4
+                                                </span>
+                                            </div>
+                                            <div className={`text-xs font-bold py-0.5 px-2 rounded-sm border-2 border-black w-fit ${table.status === 'waiting' ? 'bg-yellow' : 'bg-green'
+                                                }`}>
+                                                {table.status === 'waiting' ? '⏳ Waiting' : '🎮 Playing'}
+                                            </div>
                                         </div>
-                                        <div className={`table-status ${table.status}`}>
-                                            {table.status === 'waiting' ? '⏳ Waiting' : '🎮 Playing'}
-                                        </div>
-                                    </div>
-                                    <div className="table-actions">
-                                        <button
-                                            className="join-table-btn"
-                                            onClick={() => handleJoinTable(table.room_code)}
-                                            disabled={
-                                                // Disable only if full AND not already a member
-                                                table.room_players?.length >= 4 &&
-                                                !table.room_players?.some(rp => rp.player_id === player?.id)
-                                            }
-                                        >
-                                            {table.room_players?.some(rp => rp.player_id === player?.id)
-                                                ? 'Rejoin'
-                                                : 'Join'}
-                                        </button>
-                                        {isAdmin && (
+                                        <div className="flex gap-2">
                                             <button
-                                                className="delete-table-btn"
-                                                onClick={() => handleDeleteClick(table.id)}
-                                                title="Delete table"
+                                                className="bg-orange border-comic-thin py-2 px-4 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm uppercase hover:bg-[#FFB74D] disabled:opacity-50 disabled:cursor-not-allowed"
+                                                onClick={() => handleJoinTable(table.room_code)}
+                                                disabled={
+                                                    // Disable only if full AND not already a member
+                                                    table.room_players?.length >= 4 &&
+                                                    !table.room_players?.some(rp => rp.player_id === player?.id)
+                                                }
                                             >
-                                                🗑️
+                                                {table.room_players?.some(rp => rp.player_id === player?.id)
+                                                    ? 'Rejoin'
+                                                    : 'Join'}
                                             </button>
-                                        )}
+                                            {isAdmin && (
+                                                <button
+                                                    className="bg-white border-comic-thin p-2 rounded-md cursor-pointer shadow-comic-sm transition-all duration-150 hover:bg-red"
+                                                    onClick={() => handleDeleteClick(table.id)}
+                                                    title="Delete table"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     )}
                 </section>

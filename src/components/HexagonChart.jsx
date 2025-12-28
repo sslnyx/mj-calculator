@@ -13,7 +13,9 @@ const HexagonChart = ({
     labels = ['速度', '攻擊', '防守', '運氣', '魔法', '心態'],
     size = 280
 }) => {
-    const center = size / 2
+    const padding = 30 // Extra padding for labels
+    const svgSize = size + padding * 2
+    const center = svgSize / 2
     const radius = size * 0.4
     const labelRadius = size * 0.48
 
@@ -55,15 +57,15 @@ const HexagonChart = ({
     })
 
     return (
-        <div className="hexagon-chart-container">
-            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <div className="flex justify-center">
+            <svg width={size} height={size} viewBox={`0 0 ${svgSize} ${svgSize}`}>
                 {/* Background rings */}
                 {rings.map((ring, i) => (
                     <path
                         key={i}
                         d={ring}
                         fill="none"
-                        stroke="var(--gray-200)"
+                        stroke="#E0E0E0"
                         strokeWidth="1"
                     />
                 ))}
@@ -72,7 +74,7 @@ const HexagonChart = ({
                 <path
                     d={outerPath}
                     fill="none"
-                    stroke="var(--gray-300)"
+                    stroke="#CCCCCC"
                     strokeWidth="2"
                 />
 
@@ -84,7 +86,7 @@ const HexagonChart = ({
                         y1={center}
                         x2={p.x}
                         y2={p.y}
-                        stroke="var(--gray-200)"
+                        stroke="#E0E0E0"
                         strokeWidth="1"
                     />
                 ))}
@@ -93,7 +95,7 @@ const HexagonChart = ({
                 <motion.path
                     d={dataPath}
                     fill="rgba(255, 200, 0, 0.3)"
-                    stroke="var(--yellow)"
+                    stroke="#FFD600"
                     strokeWidth="3"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -107,8 +109,8 @@ const HexagonChart = ({
                         cx={p.x}
                         cy={p.y}
                         r="5"
-                        fill="var(--yellow)"
-                        stroke="var(--black)"
+                        fill="#FFD600"
+                        stroke="#000000"
                         strokeWidth="2"
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
@@ -124,16 +126,16 @@ const HexagonChart = ({
                         y={p.y}
                         textAnchor="middle"
                         dominantBaseline="middle"
-                        className="hexagon-label"
+                        className="font-body"
                         fontSize="14"
                         fontWeight="bold"
-                        fill="var(--black)"
+                        fill="#000000"
                     >
                         {labels[i]}
                     </text>
                 ))}
 
-                {/* Values (optional - show on hover or always) */}
+                {/* Values */}
                 {dataPoints.map((p, i) => (
                     <text
                         key={`val-${i}`}
@@ -141,7 +143,7 @@ const HexagonChart = ({
                         y={p.y - 12}
                         textAnchor="middle"
                         fontSize="10"
-                        fill="var(--gray-600)"
+                        fill="#888888"
                     >
                         {Math.round(data[i])}%
                     </text>

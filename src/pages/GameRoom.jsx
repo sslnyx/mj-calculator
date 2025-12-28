@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
@@ -29,7 +29,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [showHuModal, setShowHuModal] = useState(false)
-    const [activeTab, setActiveTab] = useState('players') // 'players' or 'log'
+    const swiperRef = useRef(null)
 
     const isAdmin = player?.is_admin === true
 
@@ -71,6 +71,8 @@ const GameRoom = ({ roomCode, onLeave }) => {
             // Force refresh room data to update UI immediately
             const updatedRoom = await getRoomByCode(roomCode)
             setRoom(updatedRoom)
+            // Navigate to Game Log slide
+            swiperRef.current?.slideTo(1)
         } catch (err) {
             console.error('Start game error:', err)
             setError(err.message)
@@ -136,7 +138,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
 
     if (loading) {
         return (
-            <div className="game-room loading">
+            <div className="h-[100svh] flex items-center justify-center bg-orange">
                 <div className="loading-spinner"></div>
             </div>
         )
@@ -144,9 +146,14 @@ const GameRoom = ({ roomCode, onLeave }) => {
 
     if (error) {
         return (
-            <div className="game-room error">
-                <p>Error: {error}</p>
-                <button onClick={onLeave}>Back</button>
+            <div className="h-[100svh] flex flex-col items-center justify-center bg-orange gap-4">
+                <p className="font-body font-bold text-lg">Error: {error}</p>
+                <button
+                    className="bg-white border-comic-thin py-2 px-6 rounded-md font-bold cursor-pointer shadow-comic-sm"
+                    onClick={onLeave}
+                >
+                    Back
+                </button>
             </div>
         )
     }
@@ -157,17 +164,21 @@ const GameRoom = ({ roomCode, onLeave }) => {
     const hasEmptySeats = players.length < 4
 
     return (
-        <div className="game-room">
+        <div className="h-[100svh] bg-orange flex flex-col overflow-hidden">
             {/* Room Header */}
-            <header className="room-header">
-                <button className="game-room-back-btn" onClick={handleLeaveRoom}>
+            <header className="bg-yellow border-b-[3px] border-black p-3 flex justify-between items-center shrink-0">
+                <button
+                    className="bg-white border-comic-thin py-1.5 px-3 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm hover:bg-gray-100"
+                    onClick={handleLeaveRoom}
+                >
                     ← Leave
                 </button>
-                <div className="room-code-display">
-                    <span className="label">Table Code</span>
-                    <span className="code">{room.room_code}</span>
+                <div className="text-center">
+                    <span className="block text-xs font-bold uppercase text-gray-500">Table Code</span>
+                    <span className="block font-title text-xl">{room.room_code}</span>
                 </div>
-                <div className="room-status">
+                <div className={`text-xs font-bold py-1 px-2 rounded-sm border-2 border-black ${room.status === 'waiting' ? 'bg-yellow' : room.status === 'active' ? 'bg-green' : 'bg-gray-200'
+                    }`}>
                     {room.status === 'waiting' && '⏳ Waiting'}
                     {room.status === 'active' && '🎮 Playing'}
                     {room.status === 'completed' && '✅ Finished'}
@@ -176,8 +187,11 @@ const GameRoom = ({ roomCode, onLeave }) => {
 
             {/* Admin: Add test players button */}
             {isAdmin && room.status === 'waiting' && hasEmptySeats && (
-                <div className="admin-controls">
-                    <button className="add-test-players-btn" onClick={handleAddTestPlayers}>
+                <div className="p-2 bg-pink border-b-2 border-black shrink-0">
+                    <button
+                        className="w-full bg-white border-comic-thin py-2 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm"
+                        onClick={handleAddTestPlayers}
+                    >
                         🧪 Add Test Players
                     </button>
                 </div>
@@ -187,45 +201,54 @@ const GameRoom = ({ roomCode, onLeave }) => {
             <Swiper
                 modules={[Pagination]}
                 pagination={{ clickable: true }}
-                className="game-swiper"
+                onSwiper={(swiper) => { swiperRef.current = swiper }}
+                className="flex-1 w-full pb-8 [&_.swiper-pagination]:bottom-0 [&_.swiper-pagination-bullet]:w-3 [&_.swiper-pagination-bullet]:h-3 [&_.swiper-pagination-bullet]:bg-white [&_.swiper-pagination-bullet]:border-2 [&_.swiper-pagination-bullet]:border-black [&_.swiper-pagination-bullet]:opacity-100 [&_.swiper-pagination-bullet]:mx-1.5 [&_.swiper-pagination-bullet-active]:!bg-cyan [&_.swiper-pagination-bullet-active]:scale-125"
                 spaceBetween={0}
                 slidesPerView={1}
             >
                 {/* Slide 1: Players */}
                 <SwiperSlide>
-                    <section className="players-grid">
+                    <section className="h-full p-4 pb-8 grid grid-cols-2 grid-rows-2 gap-3">
                         {[1, 2, 3, 4].map(seat => {
                             const playerInSeat = sortedPlayers.find(p => p.seat_position === seat)
                             return (
                                 <div
                                     key={seat}
-                                    className={`player-seat ${playerInSeat ? 'occupied' : 'empty'}`}
+                                    className={`rounded-xl border-comic-medium p-3 flex flex-col items-center justify-center text-center transition-all duration-200 ${playerInSeat
+                                        ? 'bg-white shadow-comic-md'
+                                        : 'bg-gray-200/50 border-dashed'
+                                        }`}
                                 >
                                     {playerInSeat ? (
                                         <>
-                                            <div className="player-avatar">
+                                            <div className="relative mb-2">
                                                 {playerInSeat.player?.avatar_url ? (
-                                                    <img src={playerInSeat.player.avatar_url} alt="" />
+                                                    <img
+                                                        src={playerInSeat.player.avatar_url}
+                                                        alt=""
+                                                        className="w-14 h-14 rounded-full border-comic-medium shadow-comic-sm object-cover"
+                                                    />
                                                 ) : (
-                                                    <div className="avatar-placeholder">
+                                                    <div className="w-14 h-14 rounded-full border-comic-medium shadow-comic-sm bg-gray-200 flex items-center justify-center font-title text-xl">
                                                         {playerInSeat.player?.display_name?.[0] || '?'}
                                                     </div>
                                                 )}
                                                 {playerInSeat.player_id === room.host_id && (
-                                                    <span className="host-badge">👑</span>
+                                                    <span className="absolute -top-1 -right-1 text-lg">👑</span>
                                                 )}
                                             </div>
-                                            <div className="player-name">
+                                            <div className="font-bold text-sm truncate w-full">
                                                 {playerInSeat.player?.display_name || 'Player'}
                                             </div>
-                                            <div className={`player-points ${playerInSeat.current_points >= 0 ? 'positive' : 'negative'}`}>
+                                            <div className={`font-title text-xl ${playerInSeat.current_points >= 0 ? 'text-green' : 'text-red'
+                                                }`}>
                                                 {playerInSeat.current_points >= 0 ? '+' : ''}{playerInSeat.current_points}
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="empty-seat">
-                                            <div className="seat-number">Seat {seat}</div>
-                                            <div className="waiting-text">Waiting...</div>
+                                        <div className="text-gray-500">
+                                            <div className="font-bold text-sm">Seat {seat}</div>
+                                            <div className="text-xs">Waiting...</div>
                                         </div>
                                     )}
                                 </div>
@@ -236,48 +259,64 @@ const GameRoom = ({ roomCode, onLeave }) => {
 
                 {/* Slide 2: Game Log */}
                 <SwiperSlide>
-                    <section className="game-log-container">
-                        <h3 className="log-title">GAME LOG</h3>
-                        <GameLog
-                            roomId={room.id}
-                            players={players}
-                            onUpdate={handleHuSuccess}
-                        />
+                    <section className="h-full flex flex-col p-4 pb-8">
+                        <h3 className="font-title text-xl mb-3 shrink-0">GAME LOG</h3>
+                        <div className="flex-1 overflow-hidden">
+                            <GameLog
+                                roomId={room.id}
+                                players={players}
+                                onUpdate={handleHuSuccess}
+                            />
+                        </div>
                     </section>
                 </SwiperSlide>
             </Swiper>
 
             {/* Game Controls */}
-            <section className="game-controls">
+            <section className="p-4 border-t-[3px] border-black bg-yellow shrink-0">
                 {room.status === 'waiting' && isHost && players.length >= 2 && (
-                    <button className="start-btn" onClick={handleStartGame}>
+                    <button
+                        className="w-full bg-green border-comic-medium py-3 rounded-lg font-title text-xl cursor-pointer shadow-comic-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-comic-lg active:translate-y-0.5 active:shadow-comic-sm"
+                        onClick={handleStartGame}
+                    >
                         🎮 Start Game
                     </button>
                 )}
 
                 {room.status === 'waiting' && players.length < 2 && (
-                    <p className="waiting-message">
+                    <p className="text-center font-bold">
                         Waiting for more players... ({players.length}/4)
                     </p>
                 )}
 
                 {room.status === 'active' && (
-                    <>
-                        <button className="hu-btn" onClick={() => setShowHuModal(true)}>
-                            🀄 Record Win (Hu)
+                    <div className="flex gap-3">
+                        <button
+                            className="flex-1 bg-cyan border-comic-medium py-3 rounded-lg font-title text-lg cursor-pointer shadow-comic-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-comic-lg active:translate-y-0.5 active:shadow-comic-sm"
+                            onClick={() => setShowHuModal(true)}
+                        >
+                            🀄 Record Win
                         </button>
                         {isHost && (
-                            <button className="end-btn" onClick={handleEndGame}>
-                                🏁 End Game
+                            <button
+                                className="bg-red text-white border-comic-medium py-3 px-4 rounded-lg font-title text-lg cursor-pointer shadow-comic-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-comic-lg active:translate-y-0.5 active:shadow-comic-sm"
+                                onClick={handleEndGame}
+                            >
+                                🏁 End
                             </button>
                         )}
-                    </>
+                    </div>
                 )}
 
                 {room.status === 'completed' && (
-                    <div className="game-over">
-                        <h3>Game Over!</h3>
-                        <button onClick={onLeave}>Back to Dashboard</button>
+                    <div className="text-center">
+                        <h3 className="font-title text-2xl mb-3">Game Over!</h3>
+                        <button
+                            className="bg-white border-comic-medium py-2 px-6 rounded-lg font-bold cursor-pointer shadow-comic-md"
+                            onClick={onLeave}
+                        >
+                            Back to Dashboard
+                        </button>
                     </div>
                 )}
             </section>

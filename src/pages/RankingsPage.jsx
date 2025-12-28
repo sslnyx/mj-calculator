@@ -38,7 +38,7 @@ const RankingsPage = ({ onBack }) => {
         // Calculate derived values and sort
         const sorted = data
             .map(s => {
-                const rounds = s.total_rounds_played || 1
+                const rounds = s.total_games || 1
                 const wins = s.total_wins || 1
                 return {
                     ...s,
@@ -82,29 +82,35 @@ const RankingsPage = ({ onBack }) => {
         }
     }
 
-    const getRankClass = (index) => {
-        if (index === 0) return 'gold'
-        if (index === 1) return 'silver'
-        if (index === 2) return 'bronze'
-        return ''
+    const getRankBgClass = (index) => {
+        if (index === 0) return 'bg-yellow'
+        if (index === 1) return 'bg-gray-200'
+        if (index === 2) return 'bg-orange/50'
+        return 'bg-white'
     }
 
     return (
-        <div className="rankings-page">
+        <div className="h-[100svh] bg-gray-100 flex flex-col overflow-hidden pb-16">
             {/* Header */}
-            <header className="rankings-header">
-                <button className="back-btn" onClick={onBack}>
+            <header className="bg-cyan border-b-[3px] border-black p-4 flex items-center gap-4 shrink-0">
+                <button
+                    className="bg-white border-comic-thin p-2 rounded-md cursor-pointer shadow-comic-sm hover:bg-gray-100"
+                    onClick={onBack}
+                >
                     <ArrowLeft size={24} />
                 </button>
-                <h1>排行榜</h1>
+                <h1 className="font-title text-2xl m-0">排行榜</h1>
             </header>
 
             {/* Tabs */}
-            <div className="rankings-tabs">
+            <div className="flex gap-2 p-4 shrink-0 overflow-x-auto">
                 {RANKING_TABS.map(tab => (
                     <button
                         key={tab.id}
-                        className={`ranking-tab ${activeTab === tab.id ? 'active' : ''}`}
+                        className={`flex flex-col flex-1 items-center gap-1.5 py-2 px-4 rounded-md border-comic-thin font-bold text-sm cursor-pointer transition-all duration-150 whitespace-nowrap ${activeTab === tab.id
+                            ? 'bg-orange shadow-comic-sm'
+                            : 'bg-white hover:bg-gray-100'
+                            }`}
                         onClick={() => setActiveTab(tab.id)}
                     >
                         <tab.icon size={16} />
@@ -113,41 +119,51 @@ const RankingsPage = ({ onBack }) => {
                 ))}
             </div>
 
-            {/* Rankings List */}
-            <div className="rankings-list">
+            {/* Rankings List - Scrollable */}
+            <div className="flex-1 scroll-section px-4 pb-6">
                 {loading ? (
-                    <div className="loading-state">
+                    <div className="flex items-center justify-center py-12">
                         <div className="loading-spinner"></div>
                     </div>
                 ) : players.length === 0 ? (
-                    <div className="empty-state">
-                        <p>暫無數據</p>
+                    <div className="text-center py-12">
+                        <p className="font-body font-bold text-gray-500">暫無數據</p>
                     </div>
                 ) : (
-                    players.map((player, index) => (
-                        <div key={player.player_id} className={`ranking-row ${getRankClass(index)}`}>
-                            <div className="rank-number">
-                                {index < 3 ? (
-                                    <span className="rank-medal">{['🥇', '🥈', '🥉'][index]}</span>
-                                ) : (
-                                    <span>{index + 1}</span>
-                                )}
-                            </div>
-                            <div className="rank-player">
-                                <div className="rank-avatar">
-                                    {player.player?.avatar_url ? (
-                                        <img src={player.player.avatar_url} alt="" />
+                    <div className="flex flex-col gap-3">
+                        {players.map((player, index) => (
+                            <div
+                                key={player.player_id}
+                                className={`flex items-center gap-3 p-3 rounded-lg border-comic-thin shadow-comic-sm ${getRankBgClass(index)}`}
+                            >
+                                {/* Rank Number */}
+                                <div className="w-8 h-8 flex items-center justify-center font-title text-lg shrink-0">
+                                    {index < 3 ? (
+                                        <span className="text-2xl">{['🥇', '🥈', '🥉'][index]}</span>
                                     ) : (
-                                        player.player?.display_name?.charAt(0) || '?'
+                                        <span>{index + 1}</span>
                                     )}
                                 </div>
-                                <span className="rank-name">{player.player?.display_name || 'Unknown'}</span>
+
+                                {/* Player Info */}
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <div className="w-10 h-10 rounded-full border-2 border-black overflow-hidden bg-gray-200 flex items-center justify-center text-sm font-bold shrink-0">
+                                        {player.player?.avatar_url ? (
+                                            <img src={player.player.avatar_url} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            player.player?.display_name?.charAt(0) || '?'
+                                        )}
+                                    </div>
+                                    <span className="font-bold truncate">{player.player?.display_name || 'Unknown'}</span>
+                                </div>
+
+                                {/* Rank Value */}
+                                <div className="font-title text-lg shrink-0">
+                                    {getRankValue(player)}
+                                </div>
                             </div>
-                            <div className="rank-value">
-                                {getRankValue(player)}
-                            </div>
-                        </div>
-                    ))
+                        ))}
+                    </div>
                 )}
             </div>
         </div>

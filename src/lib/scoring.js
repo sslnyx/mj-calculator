@@ -31,7 +31,8 @@ const updateRoomStats = async ({
     winType,
     fanCount,
     winnerPoints,
-    loserPoints
+    loserPoints,
+    handPatterns = []
 }) => {
     for (const player of roomPlayers) {
         const pid = player.player_id
@@ -47,7 +48,7 @@ const updateRoomStats = async ({
 
         // Base update: everyone's round count increases
         const updates = {
-            total_rounds_played: (stats.total_rounds_played || 0) + 1
+            total_games: (stats.total_games || 0) + 1
         }
 
         // WINNER
@@ -67,6 +68,15 @@ const updateRoomStats = async ({
             // Limit hand tracking (Fan >= 10)
             if (fanCount >= 10) {
                 updates.total_limit_hands = (stats.total_limit_hands || 0) + 1
+            }
+
+            // Track hand pattern counts
+            if (handPatterns && handPatterns.length > 0) {
+                const patternCounts = stats.hand_pattern_counts || {}
+                handPatterns.forEach(patternId => {
+                    patternCounts[patternId] = (patternCounts[patternId] || 0) + 1
+                })
+                updates.hand_pattern_counts = patternCounts
             }
         }
         // DEAL-IN LOSER
@@ -145,7 +155,8 @@ export const recordDirectWin = async ({
         winType: 'eat',
         fanCount,
         winnerPoints: points,
-        loserPoints: points
+        loserPoints: points,
+        handPatterns
     })
 
     return { round, points }
@@ -220,7 +231,8 @@ export const recordZimo = async ({
         winType: baoPlayerId ? 'zimo_bao' : 'zimo',
         fanCount,
         winnerPoints,
-        loserPoints: winnerPoints
+        loserPoints: winnerPoints,
+        handPatterns
     })
 
     return { round, winnerPoints }

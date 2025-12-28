@@ -120,55 +120,92 @@ const GameHistory = ({ isOpen, onClose, roomId, players, onUpdate }) => {
     if (!isOpen) return null
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content history-modal" onClick={e => e.stopPropagation()}>
-                <button className="modal-close" onClick={onClose}>×</button>
+        <div
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white w-full max-w-[360px] max-h-[80vh] rounded-xl border-comic-thick flex flex-col shadow-comic-lg relative"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Close Button */}
+                <button
+                    className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center bg-gray-100 border-2 border-black rounded-full text-lg font-bold cursor-pointer hover:bg-red hover:text-white z-10"
+                    onClick={onClose}
+                >
+                    ×
+                </button>
 
-                <h2 className="history-title">GAME LOG</h2>
+                {/* Header */}
+                <h2 className="font-title text-2xl text-center py-4 border-b-[3px] border-black bg-cyan shrink-0 rounded-t-lg">
+                    GAME LOG
+                </h2>
 
-                <div className="history-list">
+                {/* Scrollable List */}
+                <div className="flex-1 scroll-section p-4">
                     {loading ? (
-                        <div className="history-loading">Loading...</div>
+                        <div className="flex items-center justify-center py-8 text-gray-500 font-bold">
+                            Loading...
+                        </div>
                     ) : rounds.length === 0 ? (
-                        <div className="history-empty">No rounds recorded yet</div>
+                        <div className="flex items-center justify-center py-8 text-gray-500 font-bold">
+                            No rounds recorded yet
+                        </div>
                     ) : (
-                        rounds.map((round, index) => {
-                            // Calculate actual winner points
-                            const basePoints = round.points
-                            const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
-                            const winnerPoints = isZimo ? (basePoints / 2) * 3 : basePoints
+                        <div className="flex flex-col gap-2">
+                            {rounds.map((round, index) => {
+                                // Calculate actual winner points
+                                const basePoints = round.points
+                                const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
+                                const winnerPoints = isZimo ? (basePoints / 2) * 3 : basePoints
 
-                            return (
-                                <div key={round.id} className="history-item">
-                                    <div className="history-round-num">#{rounds.length - index}</div>
-                                    <div className="history-info">
-                                        <div className="history-players">
-                                            <span className="history-winner">{getPlayerName(round.winner_id)}</span>
-                                            <span className="history-action">
-                                                {round.win_type === 'eat' ? '点炮' : '自摸'}
-                                            </span>
-                                            {round.loser_id && (
-                                                <span className="history-loser">{getPlayerName(round.loser_id)}</span>
-                                            )}
-                                        </div>
-                                        <div className="history-details">
-                                            {round.fan_count}番 · +{winnerPoints}分
-                                        </div>
-                                    </div>
-                                    <button
-                                        className="history-delete-btn"
-                                        onClick={() => handleDeleteRound(round)}
-                                        disabled={deleting === round.id}
+                                return (
+                                    <div
+                                        key={round.id}
+                                        className="bg-gray-100 border-comic-thin rounded-lg p-3 flex items-center gap-3"
                                     >
-                                        {deleting === round.id ? '...' : '🗑️'}
-                                    </button>
-                                </div>
-                            )
-                        })
+                                        {/* Round Number */}
+                                        <div className="w-8 h-8 bg-black text-white rounded flex items-center justify-center font-title text-sm shrink-0">
+                                            #{rounds.length - index}
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1 text-sm font-bold">
+                                                <span className="text-green truncate">{getPlayerName(round.winner_id)}</span>
+                                                <span className={`py-0.5 px-1 rounded text-[10px] border border-black ${round.win_type === 'eat' ? 'bg-pink' : 'bg-yellow'
+                                                    }`}>
+                                                    {round.win_type === 'eat' ? '点炮' : '自摸'}
+                                                </span>
+                                                {round.loser_id && (
+                                                    <span className="text-red truncate">{getPlayerName(round.loser_id)}</span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                                {round.fan_count}番 · +{winnerPoints}分
+                                            </div>
+                                        </div>
+
+                                        {/* Delete Button */}
+                                        <button
+                                            className="w-8 h-8 flex items-center justify-center bg-white border border-black rounded cursor-pointer hover:bg-red transition-colors disabled:opacity-50"
+                                            onClick={() => handleDeleteRound(round)}
+                                            disabled={deleting === round.id}
+                                        >
+                                            {deleting === round.id ? '...' : '🗑️'}
+                                        </button>
+                                    </div>
+                                )
+                            })}
+                        </div>
                     )}
                 </div>
 
-                <button className="confirm-btn" onClick={onClose}>
+                {/* Close Button */}
+                <button
+                    className="m-4 py-3 bg-orange border-comic-medium rounded-lg font-title text-lg shadow-comic-sm cursor-pointer shrink-0"
+                    onClick={onClose}
+                >
                     CLOSE
                 </button>
             </div>

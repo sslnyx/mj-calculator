@@ -3,6 +3,27 @@ import { supabase } from '../lib/supabase'
 
 const WINDS = ['East', 'South', 'West', 'North']
 
+// Pattern ID to display name mapping
+const PATTERN_NAMES = {
+    qing_yi_se: '清一色',
+    xiao_san_yuan: '小三元',
+    hun_yi_se: '混一色',
+    dui_dui_hu: '對對糊',
+    ping_hu: '平糊',
+    hua_hu: '花糊',
+    shi_san_yao: '十三幺',
+    jiu_lian_bao_deng: '九蓮寶燈',
+    da_si_xi: '大四喜',
+    da_san_yuan: '大三元',
+    zi_yi_se: '字一色',
+    kan_kan_hu: '坎坎胡',
+    wu_hua: '無花',
+    fan_zi: '番子',
+    qiang_gang: '搶槓',
+    gang_shang_hua: '槓上開花',
+    hai_di_lao_yue: '海底撈月'
+}
+
 const GameLog = ({ roomId, players, onUpdate }) => {
     const [rounds, setRounds] = useState([])
     const [loading, setLoading] = useState(true)
@@ -83,9 +104,15 @@ const GameLog = ({ roomId, players, onUpdate }) => {
             const winType = round.win_type
             const winnerId = round.winner_id
             const loserId = round.loser_id
+            const fanCount = round.fan_count || 0
+            const handPatterns = round.hand_patterns || []
 
             const winnerPlayer = players.find(p => p.player_id === winnerId)
             const loserPlayer = loserId ? players.find(p => p.player_id === loserId) : null
+
+            // Calculate actual winner points for stats reversal
+            const isZimo = winType === 'zimo' || winType === 'zimo_bao'
+            const actualWinnerPoints = isZimo ? (points / 2) * 3 : points
 
             if (winType === 'eat') {
                 await supabase
@@ -130,6 +157,77 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                 }
             }
 
+            // === REVERSE PLAYER STATS ===
+            // Reverse stats for all players in the room
+            for (const player of players) {
+                const pid = player.player_id
+
+                // Fetch current stats
+                const { data: stats } = await supabase
+                    .from('player_stats')
+                    .select('*')
+                    .eq('player_id', pid)
+                    .single()
+
+                if (!stats) continue
+
+                // Base update: everyone's round count decreases
+                const updates = {
+                    total_games: Math.max(0, (stats.total_games || 0) - 1)
+                }
+
+                // WINNER reversal
+                if (pid === winnerId) {
+                    updates.total_wins = Math.max(0, (stats.total_wins || 0) - 1)
+                    updates.total_points_won = Math.max(0, (stats.total_points_won || 0) - actualWinnerPoints)
+                    updates.total_fan_value = Math.max(0, (stats.total_fan_value || 0) - fanCount)
+
+                    if (isZimo) {
+                        updates.total_zimo = Math.max(0, (stats.total_zimo || 0) - 1)
+                    } else {
+                        updates.total_eat = Math.max(0, (stats.total_eat || 0) - 1)
+                    }
+
+                    if (fanCount >= 10) {
+                        updates.total_limit_hands = Math.max(0, (stats.total_limit_hands || 0) - 1)
+                    }
+
+                    // Reverse hand pattern counts
+                    if (handPatterns && handPatterns.length > 0) {
+                        const patternCounts = stats.hand_pattern_counts || {}
+                        handPatterns.forEach(patternId => {
+                            if (patternCounts[patternId]) {
+                                patternCounts[patternId] = Math.max(0, patternCounts[patternId] - 1)
+                                if (patternCounts[patternId] === 0) {
+                                    delete patternCounts[patternId]
+                                }
+                            }
+                        })
+                        updates.hand_pattern_counts = patternCounts
+                    }
+                }
+                // DEAL-IN LOSER reversal
+                else if (winType === 'eat' && pid === loserId) {
+                    updates.total_deal_ins = Math.max(0, (stats.total_deal_ins || 0) - 1)
+                    updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - points)
+                }
+                // BAO LOSER reversal
+                else if (winType === 'zimo_bao' && pid === loserId) {
+                    updates.total_bao = Math.max(0, (stats.total_bao || 0) - 1)
+                    updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - actualWinnerPoints)
+                }
+                // ZIMO LOSER reversal (everyone else)
+                else if (winType === 'zimo' && pid !== winnerId) {
+                    const share = actualWinnerPoints / 3
+                    updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - share)
+                }
+
+                await supabase
+                    .from('player_stats')
+                    .update(updates)
+                    .eq('player_id', pid)
+            }
+
             // Update local state immediately
             setRounds(prev => prev.filter(r => r.id !== round.id))
             onUpdate?.()
@@ -142,15 +240,23 @@ const GameLog = ({ roomId, players, onUpdate }) => {
     }
 
     if (loading) {
-        return <div className="log-loading">Loading...</div>
+        return (
+            <div className="flex items-center justify-center h-full text-gray-500 font-bold">
+                Loading...
+            </div>
+        )
     }
 
     if (rounds.length === 0) {
-        return <div className="log-empty">No rounds recorded yet</div>
+        return (
+            <div className="flex items-center justify-center h-full text-gray-500 font-bold">
+                No rounds recorded yet
+            </div>
+        )
     }
 
     return (
-        <div className="game-log-list">
+        <div className="h-full scroll-section flex flex-col gap-2">
             {rounds.map((round, index) => {
                 const basePoints = round.points
                 const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
@@ -158,23 +264,62 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                 const roundNum = rounds.length - index
 
                 return (
-                    <div key={round.id} className="log-item">
-                        <div className="log-badge">{getSeatWind(round.winner_id)} {roundNum}</div>
-                        <div className="log-content">
-                            <span className="log-player">{getPlayerName(round.winner_id)}</span>
-                            <span className="log-hit">{round.win_type === 'eat' ? 'HIT' : 'TSUMO'}</span>
-                            {round.loser_id && (
-                                <span className="log-player">{getPlayerName(round.loser_id)}</span>
+                    <div
+                        key={round.id}
+                        className="bg-white border-comic-thin rounded-lg p-3 shadow-comic-sm"
+                    >
+                        {/* Top Row: Wind, Winner, Type, Loser, Points, Delete */}
+                        <div className="flex items-center gap-2">
+                            {/* Wind Badge */}
+                            <div className="bg-cyan text-black text-xs font-bold py-1 px-2 rounded border-2 border-black shrink-0">
+                                {getSeatWind(round.winner_id)} {roundNum}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 flex items-center gap-2 min-w-0 text-sm font-bold">
+                                <span className="truncate">{getPlayerName(round.winner_id)}</span>
+                                <span className={`py-0.5 px-1.5 rounded text-xs border border-black ${round.win_type === 'eat' ? 'bg-pink' : 'bg-yellow'
+                                    }`}>
+                                    {round.win_type === 'eat' ? 'HIT' : 'TSUMO'}
+                                </span>
+                                {round.loser_id && (
+                                    <span className="truncate text-gray-500">{getPlayerName(round.loser_id)}</span>
+                                )}
+                            </div>
+
+                            {/* Points */}
+                            <div className="font-title text-lg text-green shrink-0">
+                                +{winnerPoints}
+                            </div>
+
+                            {/* Delete Button */}
+                            <button
+                                className="w-7 h-7 flex items-center justify-center bg-gray-100 border border-black rounded text-sm cursor-pointer hover:bg-red hover:text-white transition-colors disabled:opacity-50"
+                                onClick={() => handleDeleteRound(round)}
+                                disabled={deleting === round.id}
+                            >
+                                {deleting === round.id ? '...' : '✕'}
+                            </button>
+                        </div>
+
+                        {/* Bottom Row: Hand Patterns & Fan Count */}
+                        <div className="flex items-center gap-2 mt-2 text-xs">
+                            <span className="text-orange font-bold">{round.fan_count}番</span>
+                            {round.hand_patterns && round.hand_patterns.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                    {round.hand_patterns.map((patternId, i) => (
+                                        <span
+                                            key={i}
+                                            className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-300 text-gray-700"
+                                        >
+                                            {PATTERN_NAMES[patternId] || patternId}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <span className="text-gray-400">手動輸入</span>
                             )}
                         </div>
-                        <div className="log-points">+{winnerPoints}</div>
-                        <button
-                            className="log-delete-btn"
-                            onClick={() => handleDeleteRound(round)}
-                            disabled={deleting === round.id}
-                        >
-                            {deleting === round.id ? '...' : '✕'}
-                        </button>
                     </div>
                 )
             })}

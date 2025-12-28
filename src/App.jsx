@@ -1,16 +1,15 @@
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import './App.css'
 
 const AppContent = () => {
   const { user, loading } = useAuth()
 
   if (loading) {
     return (
-      <div className="app-loading">
+      <div className="h-[100svh] flex flex-col items-center justify-center bg-orange gap-4">
         <div className="loading-spinner"></div>
-        <p>Loading...</p>
+        <p className="font-title text-2xl">Loading...</p>
       </div>
     )
   }
@@ -21,7 +20,7 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <div className="app">
+      <div className="app-container">
         <AppContent />
       </div>
     </AuthProvider>
