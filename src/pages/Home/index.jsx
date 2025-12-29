@@ -13,7 +13,7 @@ const Home = () => {
     storage_players,
     storage_rounds,
     fanPt,
-    defualtData,
+    defaultData,
     modalRef,
     backdropRef,
   } = useOutletContext();
@@ -23,7 +23,7 @@ const Home = () => {
   const [rounds, setRounds] = useState(storage_rounds ? storage_rounds : 0);
 
   const [players, setPlayers] = useState(
-    storage_players ? storage_players : defualtData
+    storage_players ? storage_players : defaultData
   );
 
   const nameHandler = (idx) => {
