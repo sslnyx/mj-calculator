@@ -1,13 +1,27 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import HexagonChart from '../components/HexagonChart'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import AvatarPicker from '../components/AvatarPicker'
+import { ArrowLeft, RefreshCw, Pencil, Check, X, Camera } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { getPlayerAvatar } from '../lib/avatar'
 
 const ProfilePage = ({ playerId, onBack }) => {
+    const { player: currentPlayer, updatePlayer } = useAuth()
     const [player, setPlayer] = useState(null)
     const [stats, setStats] = useState(null)
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
+
+    // Name editing state
+    const [isEditingName, setIsEditingName] = useState(false)
+    const [newName, setNewName] = useState('')
+    const [nameError, setNameError] = useState('')
+    const [savingName, setSavingName] = useState(false)
+
+    // Avatar picker state
+    const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+    const [savingAvatar, setSavingAvatar] = useState(false)
 
     const fetchProfile = useCallback(async (showRefresh = false) => {
         if (!playerId) return
@@ -54,6 +68,97 @@ const ProfilePage = ({ playerId, onBack }) => {
             subscription.unsubscribe()
         }
     }, [playerId, fetchProfile])
+
+    // Check if the user can change their name (once per week)
+    const canChangeName = () => {
+        if (!player?.display_name_updated_at) return true
+        const lastUpdate = new Date(player.display_name_updated_at)
+        const now = new Date()
+        const weekInMs = 7 * 24 * 60 * 60 * 1000
+        return (now - lastUpdate) >= weekInMs
+    }
+
+    // Get days until next name change
+    const getDaysUntilNextChange = () => {
+        if (!player?.display_name_updated_at) return 0
+        const lastUpdate = new Date(player.display_name_updated_at)
+        const now = new Date()
+        const weekInMs = 7 * 24 * 60 * 60 * 1000
+        const timePassed = now - lastUpdate
+        const remaining = weekInMs - timePassed
+        return Math.ceil(remaining / (24 * 60 * 60 * 1000))
+    }
+
+    // Handle name save
+    const handleSaveName = async () => {
+        const trimmedName = newName.trim()
+        if (!trimmedName) {
+            setNameError('名稱不能為空')
+            return
+        }
+        if (trimmedName.length < 2) {
+            setNameError('名稱至少需要2個字符')
+            return
+        }
+        if (trimmedName.length > 20) {
+            setNameError('名稱不能超過20個字符')
+            return
+        }
+        if (trimmedName === player.display_name) {
+            setIsEditingName(false)
+            return
+        }
+
+        setSavingName(true)
+        setNameError('')
+
+        try {
+            const updates = {
+                display_name: trimmedName,
+                display_name_updated_at: new Date().toISOString()
+            }
+            await updatePlayer(updates)
+            setPlayer(prev => ({ ...prev, ...updates }))
+            setIsEditingName(false)
+        } catch (error) {
+            console.error('Failed to update name:', error)
+            setNameError('更新失敗，請稍後再試')
+        } finally {
+            setSavingName(false)
+        }
+    }
+
+    // Start editing name
+    const startEditingName = () => {
+        setNewName(player.display_name)
+        setNameError('')
+        setIsEditingName(true)
+    }
+
+    // Cancel editing
+    const cancelEditingName = () => {
+        setIsEditingName(false)
+        setNewName('')
+        setNameError('')
+    }
+
+    // Handle avatar save
+    const handleSaveAvatar = async (seed) => {
+        setSavingAvatar(true)
+        try {
+            const updates = { avatar_seed: seed }
+            await updatePlayer(updates)
+            setPlayer(prev => ({ ...prev, ...updates }))
+            setShowAvatarPicker(false)
+        } catch (error) {
+            console.error('Failed to update avatar:', error)
+        } finally {
+            setSavingAvatar(false)
+        }
+    }
+
+    // Check if this is the current user's profile
+    const isOwnProfile = currentPlayer?.id === playerId
 
     // Calculate Hexagon values (0-100 scale)
     const calculateHexagonData = () => {
@@ -139,19 +244,89 @@ const ProfilePage = ({ playerId, onBack }) => {
             <div className="flex-1 scroll-section p-4 py-10">
                 {/* Player Info */}
                 <section className="text-center mb-6">
-                    <div className="w-24 h-24 mx-auto rounded-full border-comic-thick shadow-comic-md overflow-hidden bg-white flex items-center justify-center text-3xl font-title mb-3">
-                        {player.avatar_url ? (
-                            <img src={player.avatar_url} alt={player.display_name} className="w-full h-full object-cover" />
-                        ) : (
-                            player.display_name?.charAt(0) || '?'
+                    {/* Avatar with edit button */}
+                    <div className="relative inline-block mb-3">
+                        <div className="w-24 h-24 rounded-full border-comic-thick shadow-comic-md overflow-hidden bg-white flex items-center justify-center text-3xl font-title">
+                            <img
+                                src={getPlayerAvatar(player, 192)}
+                                alt={player.display_name}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                            />
+                        </div>
+                        {isOwnProfile && (
+                            <button
+                                onClick={() => setShowAvatarPicker(true)}
+                                className="absolute -bottom-1 -right-1 bg-orange border-comic-medium p-1.5 rounded-full cursor-pointer shadow-comic-sm hover:brightness-110"
+                                title="更改頭像"
+                            >
+                                <Camera size={14} />
+                            </button>
                         )}
                     </div>
+
+                    {/* Name Display/Edit Section */}
                     <div className="flex items-center justify-center gap-2 mb-1">
-                        <h2 className="font-title text-2xl m-0">{player.display_name}</h2>
-                        {player.is_admin && (
-                            <span className="bg-red text-white text-[10px] py-0.5 px-2 rounded-sm border-2 border-black font-bold uppercase">Admin</span>
+                        {isEditingName ? (
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={newName}
+                                        onChange={(e) => setNewName(e.target.value)}
+                                        className="font-title text-xl text-center border-comic-medium rounded-md px-3 py-1 w-40"
+                                        maxLength={20}
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleSaveName()
+                                            if (e.key === 'Escape') cancelEditingName()
+                                        }}
+                                    />
+                                    <button
+                                        onClick={handleSaveName}
+                                        disabled={savingName}
+                                        className="bg-green border-comic-thin p-1.5 rounded-md cursor-pointer shadow-comic-sm hover:brightness-110 disabled:opacity-50"
+                                    >
+                                        <Check size={18} />
+                                    </button>
+                                    <button
+                                        onClick={cancelEditingName}
+                                        disabled={savingName}
+                                        className="bg-red border-comic-thin p-1.5 rounded-md cursor-pointer shadow-comic-sm hover:brightness-110 disabled:opacity-50"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                {nameError && (
+                                    <p className="text-red text-xs font-bold">{nameError}</p>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                <h2 className="font-title text-2xl m-0">{player.display_name}</h2>
+                                {player.is_admin && (
+                                    <span className="bg-red text-white text-[10px] py-0.5 px-2 rounded-sm border-2 border-black font-bold uppercase">Admin</span>
+                                )}
+                                {isOwnProfile && canChangeName() && (
+                                    <button
+                                        onClick={startEditingName}
+                                        className="bg-yellow border-comic-thin p-1 rounded-md cursor-pointer shadow-comic-sm hover:brightness-110"
+                                        title="編輯名稱"
+                                    >
+                                        <Pencil size={14} />
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
+
+                    {/* Name change restriction notice */}
+                    {isOwnProfile && !canChangeName() && !isEditingName && (
+                        <p className="text-gray-400 text-xs mb-1">
+                            {getDaysUntilNextChange()} 天後可再次更改名稱
+                        </p>
+                    )}
+
                     <p className="text-gray-500 text-sm mb-2">{player.email}</p>
                     <div className={`inline-block font-title text-xl py-1 px-4 rounded-md border-comic-medium shadow-comic-sm ${netPoints >= 0 ? 'bg-green text-black' : 'bg-red text-white'
                         }`}>
@@ -268,6 +443,16 @@ const ProfilePage = ({ playerId, onBack }) => {
                     </section>
                 )}
             </div>
+
+            {/* Avatar Picker Modal */}
+            {showAvatarPicker && (
+                <AvatarPicker
+                    currentSeed={player.avatar_seed}
+                    onSave={handleSaveAvatar}
+                    onCancel={() => setShowAvatarPicker(false)}
+                    saving={savingAvatar}
+                />
+            )}
         </div>
     )
 }

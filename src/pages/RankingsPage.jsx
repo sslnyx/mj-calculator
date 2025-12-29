@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, Trophy, TrendingUp, Zap, Star } from 'lucide-react'
+import { getPlayerAvatar } from '../lib/avatar'
 
 const RANKING_TABS = [
     { id: 'points', label: '積分', icon: Trophy },
@@ -34,7 +35,7 @@ const RankingsPage = ({ onBack }) => {
             .from('player_stats')
             .select(`
                 *,
-                player:players (id, display_name, avatar_url)
+                player:players (id, display_name, avatar_url, avatar_seed)
             `)
 
         if (!data) {
@@ -156,11 +157,12 @@ const RankingsPage = ({ onBack }) => {
                                 {/* Player Info */}
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                     <div className="w-10 h-10 rounded-full border-2 border-black overflow-hidden bg-gray-200 flex items-center justify-center text-sm font-bold shrink-0">
-                                        {player.player?.avatar_url ? (
-                                            <img src={player.player.avatar_url} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            player.player?.display_name?.charAt(0) || '?'
-                                        )}
+                                        <img
+                                            src={getPlayerAvatar(player.player, 80)}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                            referrerPolicy="no-referrer"
+                                        />
                                     </div>
                                     <div className="flex flex-col min-w-0">
                                         <span className="font-bold truncate">{player.player?.display_name || 'Unknown'}</span>

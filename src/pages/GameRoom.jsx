@@ -13,6 +13,7 @@ import HuModal from '../components/HuModal'
 import GameLog from '../components/GameLog'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination } from 'swiper/modules'
+import { getPlayerAvatar } from '../lib/avatar'
 import 'swiper/css'
 import 'swiper/css/pagination'
 
@@ -222,17 +223,12 @@ const GameRoom = ({ roomCode, onLeave }) => {
                                     {playerInSeat ? (
                                         <>
                                             <div className="relative mb-2">
-                                                {playerInSeat.player?.avatar_url ? (
-                                                    <img
-                                                        src={playerInSeat.player.avatar_url}
-                                                        alt=""
-                                                        className="w-14 h-14 rounded-full border-comic-medium shadow-comic-sm object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-14 h-14 rounded-full border-comic-medium shadow-comic-sm bg-gray-200 flex items-center justify-center font-title text-xl">
-                                                        {playerInSeat.player?.display_name?.[0] || '?'}
-                                                    </div>
-                                                )}
+                                                <img
+                                                    src={getPlayerAvatar(playerInSeat.player, 112)}
+                                                    alt=""
+                                                    className="w-14 h-14 rounded-full border-comic-medium shadow-comic-sm object-cover"
+                                                    referrerPolicy="no-referrer"
+                                                />
                                                 {playerInSeat.player_id === room.host_id && (
                                                     <span className="absolute -top-1 -right-1 text-lg">👑</span>
                                                 )}

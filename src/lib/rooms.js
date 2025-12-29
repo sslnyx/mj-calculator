@@ -49,7 +49,7 @@ export const getRoomByCode = async (roomCode) => {
       *,
       room_players (
         *,
-        player:players (id, display_name, avatar_url)
+        player:players (id, display_name, avatar_url, avatar_seed)
       )
     `)
         .eq('room_code', roomCode.toUpperCase())

@@ -7,6 +7,7 @@ import ProfilePage from './ProfilePage'
 import RankingsPage from './RankingsPage'
 import ConfirmModal from '../components/ConfirmModal'
 import BottomNav from '../components/BottomNav'
+import { getPlayerAvatar } from '../lib/avatar'
 
 // Helper to get first name only
 const getFirstName = (fullName) => {
@@ -56,7 +57,7 @@ const Dashboard = () => {
           *,
           room_players (
             *,
-            player:players (id, display_name, avatar_url)
+            player:players (id, display_name, avatar_url, avatar_seed)
           )
         `)
                 .in('status', ['waiting', 'active'])
@@ -183,13 +184,12 @@ const Dashboard = () => {
             {/* Header */}
             <header className="bg-yellow border-b-[3px] border-black p-6 pt-8 flex justify-between items-start gap-4 shrink-0">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                    {player?.avatar_url && (
-                        <img
-                            src={player.avatar_url}
-                            alt={player.display_name}
-                            className="w-[60px] h-[60px] rounded-full border-comic-medium shadow-comic-sm shrink-0"
-                        />
-                    )}
+                    <img
+                        src={getPlayerAvatar(player, 120)}
+                        alt={player?.display_name}
+                        className="w-[60px] h-[60px] rounded-full border-comic-medium shadow-comic-sm shrink-0"
+                        referrerPolicy="no-referrer"
+                    />
                     <div className="min-w-0 flex-1">
                         <h2 className="font-title text-xl m-0 flex items-center gap-2 flex-wrap">
                             {getFirstName(player?.display_name)}
@@ -258,23 +258,14 @@ const Dashboard = () => {
                                             <div className="font-title text-2xl font-bold">{table.room_code}</div>
                                             <div className="flex items-center gap-1">
                                                 {table.room_players?.map((rp, i) => (
-                                                    rp.player?.avatar_url ? (
-                                                        <img
-                                                            key={i}
-                                                            src={rp.player.avatar_url}
-                                                            alt=""
-                                                            className="w-6 h-6 rounded-full border-2 border-black -ml-1.5 first:ml-0"
-                                                            title={rp.player?.display_name}
-                                                        />
-                                                    ) : (
-                                                        <div
-                                                            key={i}
-                                                            className="w-6 h-6 rounded-full border-2 border-black -ml-1.5 first:ml-0 flex items-center justify-center bg-gray-200 text-[10px] font-bold"
-                                                            title={rp.player?.display_name}
-                                                        >
-                                                            {rp.player?.display_name?.[0] || '?'}
-                                                        </div>
-                                                    )
+                                                    <img
+                                                        key={i}
+                                                        src={getPlayerAvatar(rp.player, 48)}
+                                                        alt=""
+                                                        className="w-6 h-6 rounded-full border-2 border-black -ml-1.5 first:ml-0"
+                                                        title={rp.player?.display_name}
+                                                        referrerPolicy="no-referrer"
+                                                    />
                                                 ))}
                                                 <span className="text-xs font-bold text-gray-500 ml-1">
                                                     {table.room_players?.length || 0}/4
