@@ -241,12 +241,12 @@ const Dashboard = () => {
                     </div>
 
                     {activeTables.length === 0 ? (
-                        <div className="text-center p-8 bg-white border-comic-thin rounded-lg border-dashed">
+                        <div className="text-center p-8 bg-white border-comic-thin rounded-lg border-dashed mx-6">
                             <p className="m-0 font-bold">No active tables</p>
                             <p className="text-gray-500 text-sm mt-2">Create a new table to start playing!</p>
                         </div>
                     ) : (
-                        <div className="flex-1 scroll-section px-6">
+                        <div className="flex-1 scroll-section px-6 py-2">
                             <div className="flex flex-col gap-4">
                                 {activeTables.map((table, index) => (
                                     <div

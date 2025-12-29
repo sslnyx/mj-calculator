@@ -180,7 +180,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
             onClick={handleClose}
         >
             <div
-                className="bg-white w-full max-w-[400px] max-h-[90vh] rounded-t-2xl border-t-4 border-x-4 border-black flex flex-col relative"
+                className="bg-white w-full max-w-[400px] max-h-svh rounded-t-2xl border-t-4 border-x-4 border-black flex flex-col relative"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Close Button */}

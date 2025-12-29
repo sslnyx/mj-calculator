@@ -9,6 +9,14 @@ const RANKING_TABS = [
     { id: 'lucky', label: '爆棚王', icon: Star }
 ]
 
+// Special titles for #1 ranked players in each category
+const RANK_TITLES = {
+    points: { title: '積分王', emoji: '👑' },
+    winrate: { title: '勝率王', emoji: '🏆' },
+    avgfan: { title: '番數王', emoji: '🐉' },
+    lucky: { title: '爆棚王', emoji: '🍀' }
+}
+
 const RankingsPage = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState('points')
     const [players, setPlayers] = useState([])
@@ -154,7 +162,15 @@ const RankingsPage = ({ onBack }) => {
                                             player.player?.display_name?.charAt(0) || '?'
                                         )}
                                     </div>
-                                    <span className="font-bold truncate">{player.player?.display_name || 'Unknown'}</span>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-bold truncate">{player.player?.display_name || 'Unknown'}</span>
+                                        {index === 0 && (
+                                            <span className="inline-flex items-center gap-1 text-xs font-bold bg-gradient-to-r from-orange to-pink px-2 py-0.5 rounded-full border border-black w-fit animate-pulse">
+                                                <span>{RANK_TITLES[activeTab].emoji}</span>
+                                                <span>{RANK_TITLES[activeTab].title}</span>
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Rank Value */}
