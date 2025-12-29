@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { getFirstName } from '../lib/names'
 import {
     getRoomByCode,
     startGame,
@@ -160,9 +161,12 @@ const GameRoom = ({ roomCode, onLeave }) => {
     }
 
     const isHost = room.host_id === player?.id
-    const players = room.room_players || []
+    const allRoomPlayers = room.room_players || []
+    const players = allRoomPlayers.filter(rp => !rp.is_spectator)
+    const spectators = allRoomPlayers.filter(rp => rp.is_spectator)
     const sortedPlayers = [...players].sort((a, b) => a.seat_position - b.seat_position)
     const hasEmptySeats = players.length < 4
+    const isSpectator = spectators.some(s => s.player_id === player?.id)
 
     return (
         <div className="h-[100svh] bg-orange flex flex-col overflow-hidden">
@@ -175,7 +179,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                     ← Leave
                 </button>
                 <div className="text-center">
-                    <span className="block text-xs font-bold uppercase text-gray-500">Table Code</span>
+                    <span className="block text-xs font-bold uppercase text-gray-500">牌局</span>
                     <span className="block font-title text-xl">{room.room_code}</span>
                 </div>
                 <div className={`text-xs font-bold py-1 px-2 rounded-sm border-2 border-black ${room.status === 'waiting' ? 'bg-yellow' : room.status === 'active' ? 'bg-green' : 'bg-gray-200'
@@ -234,7 +238,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                                                 )}
                                             </div>
                                             <div className="font-bold text-sm truncate w-full">
-                                                {playerInSeat.player?.display_name || 'Player'}
+                                                {getFirstName(playerInSeat.player?.display_name) || 'Player'}
                                             </div>
                                             <div className={`font-title text-xl ${playerInSeat.current_points >= 0 ? 'text-green' : 'text-red'
                                                 }`}>
@@ -285,7 +289,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                     </p>
                 )}
 
-                {room.status === 'active' && (
+                {room.status === 'active' && !isSpectator && (
                     <div className="flex gap-3">
                         <button
                             className="flex-1 bg-cyan border-comic-medium py-3 rounded-lg font-title text-lg cursor-pointer shadow-comic-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-comic-lg active:translate-y-0.5 active:shadow-comic-sm"
@@ -301,6 +305,16 @@ const GameRoom = ({ roomCode, onLeave }) => {
                                 🏁 End
                             </button>
                         )}
+                    </div>
+                )}
+
+                {room.status === 'active' && isSpectator && (
+                    <div className="text-center">
+                        <div className="inline-flex items-center gap-2 bg-cyan/30 border-2 border-cyan px-4 py-2 rounded-full">
+                            <span>👁</span>
+                            <span className="font-bold">Spectating</span>
+                            <span className="text-sm text-gray-600">({spectators.length} viewer{spectators.length !== 1 ? 's' : ''})</span>
+                        </div>
                     </div>
                 )}
 

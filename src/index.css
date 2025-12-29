@@ -96,4 +96,24 @@
     paint-order: stroke fill;
     text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
   }
+
+  /* Dark text stroke for colored numbers */
+  .text-stroke-dark {
+    -webkit-text-stroke: 1px rgba(0, 0, 0, 0.3);
+    paint-order: stroke fill;
+  }
+
+  /* Bold readable green text */
+  .text-green-bold {
+    color: #15803d;
+    font-weight: 700;
+    text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  /* Bold readable red text */
+  .text-red-bold {
+    color: #dc2626;
+    font-weight: 700;
+    text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.8);
+  }
 }

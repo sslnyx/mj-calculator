@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, Trophy, TrendingUp, Zap, Star } from 'lucide-react'
 import { getPlayerAvatar } from '../lib/avatar'
+import { getFirstName } from '../lib/names'
+import PlayerStatsModal from '../components/PlayerStatsModal'
 
 const RANKING_TABS = [
     { id: 'points', label: '積分', icon: Trophy },
@@ -22,6 +24,7 @@ const RankingsPage = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState('points')
     const [players, setPlayers] = useState([])
     const [loading, setLoading] = useState(true)
+    const [selectedPlayerId, setSelectedPlayerId] = useState(null)
 
     useEffect(() => {
         fetchRankings()
@@ -44,8 +47,18 @@ const RankingsPage = ({ onBack }) => {
             return
         }
 
+        // Test player IDs to exclude from rankings
+        const TEST_PLAYER_IDS = [
+            '11111111-1111-1111-1111-111111111111',
+            '22222222-2222-2222-2222-222222222222',
+            '33333333-3333-3333-3333-333333333333'
+        ]
+
+        // Filter out test players
+        const realPlayers = data.filter(s => !TEST_PLAYER_IDS.includes(s.player_id))
+
         // Calculate derived values and sort
-        const sorted = data
+        const sorted = realPlayers
             .map(s => {
                 const rounds = s.total_games || 1
                 const wins = s.total_wins || 1
@@ -143,7 +156,8 @@ const RankingsPage = ({ onBack }) => {
                         {players.map((player, index) => (
                             <div
                                 key={player.player_id}
-                                className={`flex items-center gap-3 p-3 rounded-lg border-comic-thin shadow-comic-sm ${getRankBgClass(index)}`}
+                                className={`flex items-center gap-3 p-3 rounded-lg border-comic-thin shadow-comic-sm cursor-pointer hover:scale-[1.02] transition-transform ${getRankBgClass(index)}`}
+                                onClick={() => setSelectedPlayerId(player.player_id)}
                             >
                                 {/* Rank Number */}
                                 <div className="w-8 h-8 flex items-center justify-center font-title text-lg shrink-0">
@@ -165,7 +179,7 @@ const RankingsPage = ({ onBack }) => {
                                         />
                                     </div>
                                     <div className="flex flex-col min-w-0">
-                                        <span className="font-bold truncate">{player.player?.display_name || 'Unknown'}</span>
+                                        <span className="font-bold truncate">{getFirstName(player.player?.display_name) || 'Unknown'}</span>
                                         {index === 0 && (
                                             <span className="inline-flex items-center gap-1 text-xs font-bold bg-gradient-to-r from-orange to-pink px-2 py-0.5 rounded-full border border-black w-fit animate-pulse">
                                                 <span>{RANK_TITLES[activeTab].emoji}</span>
@@ -184,6 +198,13 @@ const RankingsPage = ({ onBack }) => {
                     </div>
                 )}
             </div>
+
+            {/* Player Stats Modal */}
+            <PlayerStatsModal
+                isOpen={!!selectedPlayerId}
+                onClose={() => setSelectedPlayerId(null)}
+                playerId={selectedPlayerId}
+            />
         </div>
     )
 }

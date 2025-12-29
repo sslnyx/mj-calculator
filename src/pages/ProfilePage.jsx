@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import HexagonChart from '../components/HexagonChart'
 import AvatarPicker from '../components/AvatarPicker'
-import { ArrowLeft, RefreshCw, Pencil, Check, X, Camera } from 'lucide-react'
+import { ArrowLeft, Pencil, Check, X, Camera } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getPlayerAvatar } from '../lib/avatar'
 
@@ -177,15 +177,33 @@ const ProfilePage = ({ playerId, onBack }) => {
 
         // Defense: Deal-in Avoidance (0% = 100%, 20% = 0%)
         const dealInRate = ((stats.total_deal_ins || 0) / rounds) * 100
-        const defense = Math.max(0, 100 - (dealInRate / 20) * 100)
+        const defense = Math.max(0, 100 - (dealInRate / 40) * 100)
 
         // Luck: Zimo Rate (70% = 100%)
         const zimoRate = ((stats.total_zimo || 0) / wins) * 100
         const luck = Math.min(100, (zimoRate / 70) * 100)
 
-        // Magic: Limit Hand Frequency (15% = 100%)
+        // Magic: Pattern diversity & special hands
+        // Base: Limit hands contribute 50%, patterns contribute other 50%
         const limitRate = ((stats.total_limit_hands || 0) / wins) * 100
-        const magic = Math.min(100, (limitRate / 15) * 100)
+        const limitScore = Math.min(50, (limitRate / 15) * 50)
+
+        // Pattern score: weight different patterns
+        const patternWeights = {
+            shi_san_yao: 5, jiu_lian_bao_deng: 5, da_si_xi: 5, da_san_yuan: 5, zi_yi_se: 4, kan_kan_hu: 4, // Limit hands
+            qing_yi_se: 3, xiao_san_yuan: 3, // High value
+            hun_yi_se: 2, dui_dui_hu: 2, hua_hu: 2, // Medium value
+            ping_hu: 1, wu_hua: 1, fan_zi: 1, qiang_gang: 2, gang_shang_hua: 2, hai_di_lao_yue: 2 // Others
+        }
+        let patternScore = 0
+        if (stats.hand_pattern_counts) {
+            Object.entries(stats.hand_pattern_counts).forEach(([pattern, count]) => {
+                patternScore += (patternWeights[pattern] || 1) * count
+            })
+        }
+        // Cap pattern score contribution at 50, scale so 25 points = 50%
+        const patternContribution = Math.min(50, (patternScore / 25) * 50)
+        const magic = Math.min(100, limitScore + patternContribution)
 
         // Sanity: Bao Avoidance (0% = 100%, 10% = 0%)
         const baoRate = ((stats.total_bao || 0) / rounds) * 100
@@ -231,13 +249,6 @@ const ProfilePage = ({ playerId, onBack }) => {
                     <ArrowLeft size={24} />
                 </button>
                 <h1 className="font-title text-2xl m-0 flex-1">我的戰績</h1>
-                <button
-                    className={`bg-white border-comic-thin p-2 rounded-md cursor-pointer shadow-comic-sm hover:bg-gray-100 ${refreshing ? 'animate-spin' : ''}`}
-                    onClick={() => fetchProfile(true)}
-                    disabled={refreshing}
-                >
-                    <RefreshCw size={20} />
-                </button>
             </header>
 
             {/* Scrollable Content */}

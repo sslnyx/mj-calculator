@@ -1,19 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { createRoom, joinRoom as joinTableService } from '../lib/rooms'
+import { createRoom, joinRoom as joinTableService, joinAsSpectator } from '../lib/rooms'
 import GameRoom from './GameRoom'
 import ProfilePage from './ProfilePage'
 import RankingsPage from './RankingsPage'
+import HistoryPage from './HistoryPage'
 import ConfirmModal from '../components/ConfirmModal'
 import BottomNav from '../components/BottomNav'
 import { getPlayerAvatar } from '../lib/avatar'
-
-// Helper to get first name only
-const getFirstName = (fullName) => {
-    if (!fullName) return ''
-    return fullName.split(' ')[0]
-}
+import { getFirstName } from '../lib/names'
 
 const Dashboard = () => {
     const { player, signOut, loading } = useAuth()
@@ -123,17 +119,48 @@ const Dashboard = () => {
         setDeleteConfirm(null)
 
         try {
-            // First remove all players
+            // First, get current scores from room_players before deleting
+            const { data: roomPlayers } = await supabase
+                .from('room_players')
+                .select(`
+                    seat_position,
+                    current_points,
+                    is_spectator,
+                    player:players (id, display_name)
+                `)
+                .eq('room_id', tableId)
+                .eq('is_spectator', false)
+                .order('seat_position')
+
+            // Build final_scores object by seat
+            const finalScores = {}
+            if (roomPlayers) {
+                roomPlayers.forEach(rp => {
+                    if (rp.seat_position) {
+                        finalScores[`seat${rp.seat_position}`] = {
+                            player_id: rp.player?.id,
+                            player_name: rp.player?.display_name,
+                            points: rp.current_points || 0
+                        }
+                    }
+                })
+            }
+
+            // Update game room with final scores and completed status
+            await supabase
+                .from('game_rooms')
+                .update({
+                    status: 'completed',
+                    ended_at: new Date().toISOString(),
+                    final_scores: Object.keys(finalScores).length > 0 ? finalScores : null
+                })
+                .eq('id', tableId)
+
+            // Then remove all players
             await supabase
                 .from('room_players')
                 .delete()
                 .eq('room_id', tableId)
-
-            // Then delete/close the table
-            await supabase
-                .from('game_rooms')
-                .update({ status: 'completed', ended_at: new Date().toISOString() })
-                .eq('id', tableId)
         } catch (err) {
             setError(err.message)
         } finally {
@@ -174,6 +201,16 @@ const Dashboard = () => {
         return (
             <>
                 <RankingsPage onBack={() => setCurrentPage('home')} />
+                <BottomNav currentPage={currentPage} onNavigate={setCurrentPage} />
+            </>
+        )
+    }
+
+    // History Page
+    if (currentPage === 'history') {
+        return (
+            <>
+                <HistoryPage onBack={() => setCurrentPage('home')} />
                 <BottomNav currentPage={currentPage} onNavigate={setCurrentPage} />
             </>
         )
@@ -277,19 +314,51 @@ const Dashboard = () => {
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button
-                                                className="bg-orange border-comic-thin py-2 px-4 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm uppercase hover:bg-[#FFB74D] disabled:opacity-50 disabled:cursor-not-allowed"
-                                                onClick={() => handleJoinTable(table.room_code)}
-                                                disabled={
-                                                    // Disable only if full AND not already a member
-                                                    table.room_players?.length >= 4 &&
-                                                    !table.room_players?.some(rp => rp.player_id === player?.id)
+                                            {/* Join/Rejoin button - only if not full or already member */}
+                                            {(() => {
+                                                const isMember = table.room_players?.some(rp => rp.player_id === player?.id)
+                                                const nonSpectators = table.room_players?.filter(rp => !rp.is_spectator) || []
+                                                const isFull = nonSpectators.length >= 4
+
+                                                if (isMember) {
+                                                    return (
+                                                        <button
+                                                            className="bg-orange border-comic-thin py-2 px-4 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm uppercase hover:bg-[#FFB74D]"
+                                                            onClick={() => handleJoinTable(table.room_code)}
+                                                        >
+                                                            Rejoin
+                                                        </button>
+                                                    )
                                                 }
-                                            >
-                                                {table.room_players?.some(rp => rp.player_id === player?.id)
-                                                    ? 'Rejoin'
-                                                    : 'Join'}
-                                            </button>
+
+                                                if (!isFull) {
+                                                    return (
+                                                        <button
+                                                            className="bg-orange border-comic-thin py-2 px-4 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm uppercase hover:bg-[#FFB74D]"
+                                                            onClick={() => handleJoinTable(table.room_code)}
+                                                        >
+                                                            Join
+                                                        </button>
+                                                    )
+                                                }
+
+                                                // Full and not a member - show Spectate button
+                                                return (
+                                                    <button
+                                                        className="bg-cyan border-comic-thin py-2 px-4 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm uppercase hover:bg-[#4DD0E1]"
+                                                        onClick={async () => {
+                                                            try {
+                                                                await joinAsSpectator(table.room_code, player.id)
+                                                                setCurrentTable(table.room_code)
+                                                            } catch (err) {
+                                                                setError(err.message)
+                                                            }
+                                                        }}
+                                                    >
+                                                        👁 Spectate
+                                                    </button>
+                                                )
+                                            })()}
                                             {isAdmin && (
                                                 <button
                                                     className="bg-white border-comic-thin p-2 rounded-md cursor-pointer shadow-comic-sm transition-all duration-150 hover:bg-red"
