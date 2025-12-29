@@ -277,7 +277,11 @@ export const subscribeToRoom = (roomId, callback) => {
             },
             callback
         )
-        .subscribe()
+        .subscribe((status, err) => {
+            if (err) {
+                console.error('[Realtime] Subscription error:', err)
+            }
+        })
 
     return channel
 }
