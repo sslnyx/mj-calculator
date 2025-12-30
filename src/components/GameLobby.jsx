@@ -86,7 +86,7 @@ const GameLobby = ({ player, onBack }) => {
                     onClick={onBack}
                     className="bg-gray-600 text-white px-4 py-2 rounded-lg font-bold border-2 border-black"
                 >
-                    ← Back
+                    ← 返回
                 </button>
 
                 <div className="flex gap-2">

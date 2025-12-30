@@ -41,7 +41,7 @@ const Login = () => {
             >
                 {/* Shine effect */}
                 <span className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-r from-transparent via-white/40 to-transparent rotate-45 animate-shine pointer-events-none"></span>
-                <span className="relative z-10">START</span>
+                <span className="relative z-10">開始</span>
             </button>
         </div>
     )

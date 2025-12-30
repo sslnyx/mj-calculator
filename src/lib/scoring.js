@@ -54,8 +54,12 @@ const updateRoomStats = async ({
         // WINNER
         if (pid === winnerId) {
             const isZimo = winType === 'zimo' || winType === 'zimo_bao'
+            // For zimo, winner gets (basePoints / 2) * 3
+            // winnerPoints passed in should already be the BASE points
+            const actualWinnerPoints = isZimo ? (winnerPoints / 2) * 3 : winnerPoints
+
             updates.total_wins = (stats.total_wins || 0) + 1
-            updates.total_points_won = (stats.total_points_won || 0) + winnerPoints
+            updates.total_points_won = (stats.total_points_won || 0) + actualWinnerPoints
             updates.total_fan_value = (stats.total_fan_value || 0) + fanCount
             updates.highest_fan = Math.max(stats.highest_fan || 0, fanCount)
 
@@ -84,14 +88,17 @@ const updateRoomStats = async ({
             updates.total_deal_ins = (stats.total_deal_ins || 0) + 1
             updates.total_points_lost = (stats.total_points_lost || 0) + loserPoints
         }
-        // BAO LOSER
+        // BAO LOSER - pays the full zimo amount
         else if (winType === 'zimo_bao' && pid === loserId) {
             updates.total_bao = (stats.total_bao || 0) + 1
-            updates.total_points_lost = (stats.total_points_lost || 0) + loserPoints
+            // Bao loser pays (basePoints / 2) * 3
+            const baoLoss = (winnerPoints / 2) * 3
+            updates.total_points_lost = (stats.total_points_lost || 0) + baoLoss
         }
-        // ZIMO LOSER (everyone else pays share)
+        // ZIMO LOSER (everyone else pays half the base)
         else if (winType === 'zimo' && pid !== winnerId) {
-            const share = winnerPoints / 3
+            // Each loser pays (basePoints / 2)
+            const share = winnerPoints / 2
             updates.total_points_lost = (stats.total_points_lost || 0) + share
         }
 

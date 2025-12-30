@@ -255,7 +255,7 @@ const GameLog = ({ roomId, players, onUpdate }) => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full text-gray-500 font-bold">
-                Loading...
+                載入中...
             </div>
         )
     }

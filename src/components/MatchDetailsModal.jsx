@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { getFirstName } from '../lib/names'
 import { getPlayerAvatar } from '../lib/avatar'
 
@@ -36,6 +38,36 @@ const PATTERN_NAMES = {
 }
 
 const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
+    const [playerAvatars, setPlayerAvatars] = useState({}) // player_id -> avatar data
+
+    // Fetch player avatars when modal opens
+    useEffect(() => {
+        if (!isOpen || !match?.finalScores) return
+
+        const playerIds = Object.values(match.finalScores)
+            .map(data => data.player_id)
+            .filter(Boolean)
+
+        if (playerIds.length === 0) return
+
+        const fetchAvatars = async () => {
+            const { data } = await supabase
+                .from('players')
+                .select('id, avatar_url, avatar_seed')
+                .in('id', playerIds)
+
+            if (data) {
+                const avatarMap = {}
+                data.forEach(p => {
+                    avatarMap[p.id] = { avatar_url: p.avatar_url, avatar_seed: p.avatar_seed, id: p.id }
+                })
+                setPlayerAvatars(avatarMap)
+            }
+        }
+
+        fetchAvatars()
+    }, [isOpen, match])
+
     if (!isOpen || !match) return null
 
     const { room, rounds, finalScores } = match
@@ -98,7 +130,7 @@ const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
                 {/* Header */}
                 <div className="py-4 px-4 rounded-t-lg border-b-[3px] border-black shrink-0" style={{ backgroundColor: '#9333EA' }}>
                     <h2 className="font-title text-2xl text-center text-white drop-shadow-md">
-                        🀄 {room.room_code}
+                        {room.room_code}
                     </h2>
                     <div className="text-center text-sm text-white/90 mt-1">
                         {new Date(room.created_at).toLocaleDateString('zh-CN', {
@@ -130,7 +162,7 @@ const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
                                                 }`}
                                         >
                                             <img
-                                                src={getPlayerAvatar(data.avatar_seed, data.avatar_url)}
+                                                src={getPlayerAvatar(playerAvatars[data.player_id] || { id: data.player_id }, 64)}
                                                 alt=""
                                                 className="w-8 h-8 mx-auto rounded-full border border-black mb-1"
                                                 referrerPolicy="no-referrer"

@@ -145,7 +145,7 @@ const GameHistory = ({ isOpen, onClose, roomId, players, onUpdate }) => {
                 <div className="flex-1 scroll-section p-4">
                     {loading ? (
                         <div className="flex items-center justify-center py-8 text-gray-500 font-bold">
-                            Loading...
+                            載入中...
                         </div>
                     ) : rounds.length === 0 ? (
                         <div className="flex items-center justify-center py-8 text-gray-500 font-bold">

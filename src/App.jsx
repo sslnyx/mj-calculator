@@ -15,7 +15,7 @@ const AppContent = () => {
     return (
       <div className="h-[100svh] flex flex-col items-center justify-center bg-orange gap-4">
         <div className="loading-spinner"></div>
-        <p className="font-title text-2xl">Loading...</p>
+        <p className="font-title text-2xl">載入中...</p>
       </div>
     )
   }

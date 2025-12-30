@@ -20,7 +20,7 @@ const Dashboard = () => {
     const [currentPage, setCurrentPage] = useState('home') // 'home', 'profile', 'rankings'
     const [error, setError] = useState(null)
     const [isCreating, setIsCreating] = useState(false)
-    const [deleteConfirm, setDeleteConfirm] = useState(null) // tableId to delete
+    const [archiveConfirm, setArchiveConfirm] = useState(null) // tableId to archive
 
     const isAdmin = player?.is_admin === true
     const deletingRef = useRef(false)
@@ -107,17 +107,17 @@ const Dashboard = () => {
         }
     }
 
-    const handleDeleteClick = (tableId) => {
+    const handleArchiveClick = (tableId) => {
         if (!isAdmin) return
-        setDeleteConfirm(tableId)
+        setArchiveConfirm(tableId)
     }
 
-    const handleDeleteConfirm = async () => {
-        if (!deleteConfirm || deletingRef.current) return
+    const handleArchiveConfirm = async () => {
+        if (!archiveConfirm || deletingRef.current) return
 
         deletingRef.current = true
-        const tableId = deleteConfirm
-        setDeleteConfirm(null)
+        const tableId = archiveConfirm
+        setArchiveConfirm(null)
 
         try {
             // First, get current scores from room_players before deleting
@@ -184,7 +184,7 @@ const Dashboard = () => {
 
     // If at a table, show the table view
     if (currentTable) {
-        return <GameRoom roomCode={currentTable} onLeave={handleLeaveTable} />
+        return <GameRoom roomCode={currentTable} onLeave={handleLeaveTable} onNavigate={setCurrentPage} />
     }
 
     // Profile Page
@@ -248,7 +248,7 @@ const Dashboard = () => {
                     className="bg-white border-comic-thin py-2 px-4 rounded-md font-bold text-xs cursor-pointer shadow-comic-sm uppercase shrink-0 hover:bg-gray-100"
                     onClick={signOut}
                 >
-                    Sign Out
+                    登出
                 </button>
             </header>
 
@@ -274,24 +274,24 @@ const Dashboard = () => {
                         onClick={handleCreateTable}
                         disabled={isCreating}
                     >
-                        {isCreating ? 'Creating...' : '🀄 Create New Table'}
+                        {isCreating ? '開緊...' : '開新枱'}
                     </button>
                 </section>
 
-                {/* Active Tables - Scrollable Section */}
+                {/* 進行中嘅枱 - Scrollable Section */}
                 <section className="flex-1 flex flex-col">
                     <div className="px-6">
 
                         <h3 className="font-title text-xl mb-4 flex items-center gap-2 shrink-0">
                             <span className="flex items-center justify-center w-7 h-7 bg-black text-white rounded-sm text-sm shadow-[2px_2px_0_#888888]">#</span>
-                            Active Tables
+                            進行中嘅枱
                         </h3>
                     </div>
 
                     {activeTables.length === 0 ? (
                         <div className="text-center p-8 bg-white border-comic-thin rounded-lg border-dashed mx-6">
-                            <p className="m-0 font-bold">No active tables</p>
-                            <p className="text-gray-500 text-sm mt-2">Create a new table to start playing!</p>
+                            <p className="m-0 font-bold">暫時冇枱</p>
+                            <p className="text-gray-500 text-sm mt-2">開新枱開始打牌!</p>
                         </div>
                     ) : (
                         <div className="flex-1 scroll-section px-6 py-2">
@@ -321,7 +321,7 @@ const Dashboard = () => {
                                             </div>
                                             <div className={`text-xs font-bold py-0.5 px-2 rounded-sm border-2 border-black w-fit ${table.status === 'waiting' ? 'bg-yellow' : 'bg-green'
                                                 }`}>
-                                                {table.status === 'waiting' ? '⏳ Waiting' : '🎮 Playing'}
+                                                {table.status === 'waiting' ? '⏳ 等緊人' : '🎮 對戰中'}
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
@@ -353,7 +353,7 @@ const Dashboard = () => {
                                                     )
                                                 }
 
-                                                // Full and not a member - show Spectate button
+                                                // Full and not a member - show 觀戰 button
                                                 return (
                                                     <button
                                                         className="bg-cyan border-comic-thin py-2 px-4 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm uppercase hover:bg-[#4DD0E1]"
@@ -366,17 +366,17 @@ const Dashboard = () => {
                                                             }
                                                         }}
                                                     >
-                                                        👁 Spectate
+                                                        👁 觀戰
                                                     </button>
                                                 )
                                             })()}
                                             {isAdmin && (
                                                 <button
-                                                    className="bg-white border-comic-thin p-2 rounded-md cursor-pointer shadow-comic-sm transition-all duration-150 hover:bg-red"
-                                                    onClick={() => handleDeleteClick(table.id)}
-                                                    title="Delete table"
+                                                    className="bg-white border-comic-thin p-2 rounded-md cursor-pointer shadow-comic-sm transition-all duration-150 hover:bg-orange"
+                                                    onClick={() => handleArchiveClick(table.id)}
+                                                    title="結束牌局"
                                                 >
-                                                    🗑️
+                                                    📦
                                                 </button>
                                             )}
                                         </div>
@@ -388,13 +388,13 @@ const Dashboard = () => {
                 </section>
             </main>
 
-            {/* Delete Confirmation Modal */}
+            {/* Archive Confirmation Modal */}
             <ConfirmModal
-                isOpen={deleteConfirm !== null}
-                title="Delete Table"
-                message="Are you sure you want to delete this table? All players will be removed."
-                onConfirm={handleDeleteConfirm}
-                onCancel={() => setDeleteConfirm(null)}
+                isOpen={archiveConfirm !== null}
+                title="結束牌局"
+                message="結束呢個牌局? 最終成績會被保存。"
+                onConfirm={handleArchiveConfirm}
+                onCancel={() => setArchiveConfirm(null)}
             />
 
             {/* Fixed Bottom Navigation */}

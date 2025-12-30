@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Info } from 'lucide-react'
+import { Info, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { getPointsForFan, recordDirectWin, recordZimo } from '../lib/scoring'
 
 // Extended Fan options (0-13)
@@ -46,7 +46,7 @@ const HAND_PATTERNS = {
     ]
 }
 
-const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
+const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) => {
     const [winType, setWinType] = useState('eat') // 'eat', 'zimo', or 'zimo_bao'
     const [winnerId, setWinnerId] = useState(null)
     const [loserId, setLoserId] = useState(null)
@@ -181,7 +181,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
     // Get points display for current fan
     const getPointsDisplay = () => {
         const points = getPointsForFan(effectiveFan)
-        return `${effectiveFan}番 = ${points}pts`
+        return `${effectiveFan}番 = ${points}分`
     }
 
     // Check if a limit hand should be disabled (when zimo_bao is selected but hand has no bao)
@@ -221,7 +221,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
 
                     {/* Winner Selection */}
                     <div>
-                        <label className="block font-bold text-sm mb-2 uppercase">WHO WON?</label>
+                        <label className="block font-bold text-sm mb-2 uppercase">邊個食糊?</label>
                         <div className="grid grid-cols-2 gap-2">
                             {players.map(p => (
                                 <button
@@ -263,7 +263,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                     {/* Loser Selection (for eat) */}
                     {winType === 'eat' && (
                         <div>
-                            <label className="block font-bold text-sm mb-2 uppercase">WHO DEALT IN?</label>
+                            <label className="block font-bold text-sm mb-2 uppercase">邊個出銃?</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {players.map(p => (
                                     <button
@@ -287,7 +287,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                     {/* Bao player selection (for zimo_bao) */}
                     {winType === 'zimo_bao' && (
                         <div>
-                            <label className="block font-bold text-sm mb-2 uppercase">WHO IS 包?</label>
+                            <label className="block font-bold text-sm mb-2 uppercase">邊個包?</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {players.map(p => (
                                     <button
@@ -310,17 +310,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
 
                     {/* Hand Pattern Selection */}
                     <div>
-                        <label className="block font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                            牌型 (Hand Patterns)
-                            <button
-                                type="button"
-                                className="w-5 h-5 bg-cyan rounded-full flex items-center justify-center border border-black hover:bg-cyan/80"
-                                onClick={() => window.location.hash = '#patterns'}
-                                title="查看所有牌型"
-                            >
-                                <Info size={12} />
-                            </button>
-                        </label>
+                        <label className="block font-bold text-sm mb-2 uppercase">牌型</label>
 
                         {/* Tabs for Regular / Limit */}
                         <div className="flex gap-1 mb-2">
@@ -386,19 +376,19 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                                 <span className="font-bold text-sm">番子</span>
                                 <div className="flex items-center gap-2">
                                     <button
-                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50 flex justify-center items-center"
                                         onClick={() => setFanZiCount(prev => Math.max(0, prev - 1))}
                                         disabled={fanZiCount === 0}
                                     >
-                                        ◀
+                                        <ChevronLeft size={16} />
                                     </button>
                                     <span className="w-6 text-center font-title text-lg">{fanZiCount}</span>
                                     <button
-                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50 flex justify-center items-center"
                                         onClick={() => setFanZiCount(prev => Math.min(4, prev + 1))}
                                         disabled={fanZiCount === 4}
                                     >
-                                        ▶
+                                        <ChevronRight size={16} />
                                     </button>
                                 </div>
                             </div>
@@ -408,19 +398,19 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                                 <span className="font-bold text-sm">正花</span>
                                 <div className="flex items-center gap-2">
                                     <button
-                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50 flex justify-center items-center"
                                         onClick={() => setZhengHuaCount(prev => Math.max(0, prev - 1))}
                                         disabled={zhengHuaCount === 0}
                                     >
-                                        ◀
+                                        <ChevronLeft size={16} />
                                     </button>
                                     <span className="w-6 text-center font-title text-lg">{zhengHuaCount}</span>
                                     <button
-                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50 flex justify-center items-center"
                                         onClick={() => setZhengHuaCount(prev => Math.min(2, prev + 1))}
                                         disabled={zhengHuaCount === 2}
                                     >
-                                        ▶
+                                        <ChevronRight size={16} />
                                     </button>
                                 </div>
                             </div>
@@ -452,7 +442,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                                 className="w-full text-left text-xs font-bold text-gray-500 flex items-center gap-1"
                                 onClick={() => setShowRareAddons(!showRareAddons)}
                             >
-                                其他附加 {showRareAddons ? '▲' : '▼'}
+                                其他附加 {showRareAddons ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 {selectedPatterns.some(id => ['wu_hua', 'qiang_gang', 'gang_shang_hua', 'hai_di_lao_yue', 'hua_hu', 'yi_tai_hua'].includes(id)) && (
                                     <span className="text-orange">•</span>
                                 )}
@@ -480,7 +470,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                     {/* Fan Selection */}
                     <div>
                         <label className="block font-bold text-sm mb-2 uppercase flex justify-between items-center">
-                            <span>番 (FAN)</span>
+                            <span>番</span>
                             <span className="text-orange font-title text-base">{getPointsDisplay()}</span>
                         </label>
                         <div className="grid grid-cols-7 gap-1">

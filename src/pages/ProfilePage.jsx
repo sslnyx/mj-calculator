@@ -216,7 +216,7 @@ const ProfilePage = ({ playerId, onBack }) => {
         return (
             <div className="h-[100svh] flex flex-col items-center justify-center bg-gray-100 pb-16">
                 <div className="loading-spinner"></div>
-                <p className="font-body font-bold mt-4">Loading...</p>
+                <p className="font-body font-bold mt-4">載入中...</p>
             </div>
         )
     }
@@ -341,7 +341,7 @@ const ProfilePage = ({ playerId, onBack }) => {
                     <p className="text-gray-500 text-sm mb-2">{player.email}</p>
                     <div className={`inline-block font-title text-xl py-1 px-4 rounded-md border-comic-medium shadow-comic-sm ${netPoints >= 0 ? 'bg-green text-black' : 'bg-red text-white'
                         }`}>
-                        {netPoints >= 0 ? '+' : ''}{netPoints} pts
+                        {netPoints >= 0 ? '+' : ''}{netPoints} 分
                     </div>
                 </section>
 

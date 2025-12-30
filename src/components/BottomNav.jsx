@@ -4,9 +4,9 @@ const BottomNav = ({ currentPage, onNavigate }) => {
     const navItems = [
         { id: 'home', label: '大廳', icon: Home },
         { id: 'rankings', label: '排行', icon: Trophy },
-        { id: 'patterns', label: '牌型', icon: Info },
         { id: 'profile', label: '我的', icon: User },
-        { id: 'history', label: '歷史', icon: Clock }
+        { id: 'history', label: '歷史', icon: Clock },
+        { id: 'patterns', label: '牌型', icon: Info }
     ]
 
     return (

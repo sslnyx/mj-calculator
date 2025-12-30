@@ -29,13 +29,13 @@ const PATTERNS_DATA = {
     bonus: [
         { id: 'hua_hu', name: '花糊', fan: 3, desc: '收到七張花牌' },
         { id: 'yi_tai_hua', name: '一臺花', fan: 2, desc: '收齊四張同系列花牌（春夏秋冬或梅蘭竹菊）' },
-        { id: 'gang_shang_hua', name: '槓上開花', fan: 2, desc: '開槓後摸的補牌正好胡牌' },
+        { id: 'gang_shang_hua', name: '槓上開花', fan: 2, desc: '開槓（明槓/暗槓/加槓）後摸的補牌正好胡牌。補牌算自摸，所以同時計自摸+槓上開花' },
         { id: 'ping_hu', name: '平糊', fan: 1, desc: '全靠順子組成，無刻子，對子不能是龍' },
-        { id: 'men_qian_qing', name: '門前清', fan: 1, desc: '沒有碰/槓其他人的牌，全部靠自己摸' },
+        { id: 'men_qian_qing', name: '門前清', fan: 1, desc: '沒有碰/明槓其他人的牌。暗槓不影響門前清' },
         { id: 'zheng_hua', name: '正花', fan: 1, desc: '收到與自己座位對應的花牌（最多2個）' },
         { id: 'wu_hua', name: '無花', fan: 1, desc: '全局沒有收到任何花牌' },
         { id: 'fan_zi', name: '番子', fan: 1, desc: '有三元牌或風牌的刻子（東/南/西/北/中/發/白）' },
-        { id: 'qiang_gang', name: '搶槓', fan: 1, desc: '別人加槓時，截糊該張牌' },
+        { id: 'qiang_gang', name: '搶槓', fan: 1, desc: '別人加槓時，截糊該張牌。只適用於加槓，算放銃由加槓者賠' },
         { id: 'hai_di_lao_yue', name: '海底撈月', fan: 1, desc: '摸最後一張牌胡牌' },
     ]
 }
@@ -51,7 +51,7 @@ const PatternsPage = ({ onBack }) => {
                 >
                     <ArrowLeft size={24} />
                 </button>
-                <h1 className="font-title text-2xl m-0 flex-1">🀄 牌型一覽</h1>
+                <h1 className="font-title text-2xl m-0 flex-1">牌型一覽</h1>
             </header>
 
             {/* Content */}
@@ -126,6 +126,36 @@ const PatternsPage = ({ onBack }) => {
                                 <p className="text-sm text-gray-600">{pattern.desc}</p>
                             </div>
                         ))}
+                    </div>
+                </section>
+
+                {/* Kong Types Reference */}
+                <section className="mb-6">
+                    <h2 className="font-title text-xl mb-3 flex items-center gap-2">
+                        <span className="bg-orange px-3 py-1 rounded border-2 border-black">槓的種類</span>
+                    </h2>
+                    <div className="flex flex-col gap-2">
+                        <div className="bg-white border-comic-thin rounded-lg p-3 shadow-comic-sm">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="font-title text-lg">明槓</span>
+                                <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">Exposed Kong</span>
+                            </div>
+                            <p className="text-sm text-gray-600">別人打出牌，你有3張相同的牌，可以槓。4張牌全部面朝上</p>
+                        </div>
+                        <div className="bg-white border-comic-thin rounded-lg p-3 shadow-comic-sm">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="font-title text-lg">暗槓</span>
+                                <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">Concealed Kong</span>
+                            </div>
+                            <p className="text-sm text-gray-600">自己摸齊4張相同的牌，可以暗槓。4張牌面朝下，不影響門前清</p>
+                        </div>
+                        <div className="bg-white border-comic-thin rounded-lg p-3 shadow-comic-sm">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="font-title text-lg">加槓</span>
+                                <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">Extended Kong</span>
+                            </div>
+                            <p className="text-sm text-gray-600">已經碰了3張，再摸到第4張可以加槓。別人可以搶槓截糊</p>
+                        </div>
                     </div>
                 </section>
 

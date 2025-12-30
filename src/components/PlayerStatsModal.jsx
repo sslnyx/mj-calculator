@@ -152,7 +152,7 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
                     </div>
                 ) : !player ? (
                     <div className="flex items-center justify-center py-20">
-                        <p className="font-body font-bold text-gray-500">Player not found</p>
+                        <p className="font-body font-bold text-gray-500">搵唔到玩家</p>
                     </div>
                 ) : (
                     <div className="flex-1 scroll-section p-5">
@@ -169,7 +169,7 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
                             <h2 className="font-title text-xl m-0 mb-2">{getFirstName(player.display_name)}</h2>
                             <div className={`inline-block font-title text-lg py-1 px-4 rounded-md border-comic-medium shadow-comic-sm ${netPoints >= 0 ? 'bg-green text-black' : 'bg-red text-white'
                                 }`}>
-                                {netPoints >= 0 ? '+' : ''}{netPoints} pts
+                                {netPoints >= 0 ? '+' : ''}{netPoints} 分
                             </div>
                         </section>
 

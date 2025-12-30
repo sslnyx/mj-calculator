@@ -11,7 +11,7 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
                 onClick={e => e.stopPropagation()}
             >
                 <header className="mb-4">
-                    <h2 className="font-title text-2xl m-0">{title || 'Confirm'}</h2>
+                    <h2 className="font-title text-2xl m-0">{title || '確認'}</h2>
                 </header>
                 <div className="mb-6">
                     <p className="font-body font-bold m-0">{message}</p>

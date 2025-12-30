@@ -25,7 +25,7 @@ const TEST_PLAYERS = [
     { id: '33333333-3333-3333-3333-333333333333', name: 'Player C' }
 ]
 
-const GameRoom = ({ roomCode, onLeave }) => {
+const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
     const { player } = useAuth()
     const [room, setRoom] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -185,7 +185,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                 <div className={`text-xs font-bold py-1 px-2 rounded-sm border-2 border-black ${room.status === 'waiting' ? 'bg-yellow' : room.status === 'active' ? 'bg-green' : 'bg-gray-200'
                     }`}>
                     {room.status === 'waiting' && '⏳ Waiting'}
-                    {room.status === 'active' && '🎮 Playing'}
+                    {room.status === 'active' && '🎮 對戰中'}
                     {room.status === 'completed' && '✅ Finished'}
                 </div>
             </header>
@@ -197,7 +197,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                         className="w-full bg-white border-comic-thin py-2 rounded-md font-bold text-sm cursor-pointer shadow-comic-sm"
                         onClick={handleAddTestPlayers}
                     >
-                        🧪 Add Test Players
+                        🧪 加測試玩家
                     </button>
                 </div>
             )}
@@ -279,7 +279,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                         className="w-full bg-green border-comic-medium py-3 rounded-lg font-title text-xl cursor-pointer shadow-comic-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-comic-lg active:translate-y-0.5 active:shadow-comic-sm"
                         onClick={handleStartGame}
                     >
-                        🎮 Start Game
+                        🎮 開始
                     </button>
                 )}
 
@@ -295,7 +295,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                             className="flex-1 bg-cyan border-comic-medium py-3 rounded-lg font-title text-lg cursor-pointer shadow-comic-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-comic-lg active:translate-y-0.5 active:shadow-comic-sm"
                             onClick={() => setShowHuModal(true)}
                         >
-                            🀄 Record Win
+                            記錄食糊
                         </button>
                         {isHost && (
                             <button
@@ -312,8 +312,8 @@ const GameRoom = ({ roomCode, onLeave }) => {
                     <div className="text-center">
                         <div className="inline-flex items-center gap-2 bg-cyan/30 border-2 border-cyan px-4 py-2 rounded-full">
                             <span>👁</span>
-                            <span className="font-bold">Spectating</span>
-                            <span className="text-sm text-gray-600">({spectators.length} viewer{spectators.length !== 1 ? 's' : ''})</span>
+                            <span className="font-bold">觀戰中</span>
+                            <span className="text-sm text-gray-600">({spectators.length} 個觀眾)</span>
                         </div>
                     </div>
                 )}
@@ -338,6 +338,7 @@ const GameRoom = ({ roomCode, onLeave }) => {
                 roomId={room.id}
                 players={players}
                 onSuccess={handleHuSuccess}
+                onNavigate={onNavigate}
             />
         </div>
     )
