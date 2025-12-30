@@ -6,6 +6,7 @@ import GameRoom from './GameRoom'
 import ProfilePage from './ProfilePage'
 import RankingsPage from './RankingsPage'
 import HistoryPage from './HistoryPage'
+import PatternsPage from './PatternsPage'
 import ConfirmModal from '../components/ConfirmModal'
 import BottomNav from '../components/BottomNav'
 import { getPlayerAvatar } from '../lib/avatar'
@@ -211,6 +212,16 @@ const Dashboard = () => {
         return (
             <>
                 <HistoryPage onBack={() => setCurrentPage('home')} />
+                <BottomNav currentPage={currentPage} onNavigate={setCurrentPage} />
+            </>
+        )
+    }
+
+    // Patterns Page
+    if (currentPage === 'patterns') {
+        return (
+            <>
+                <PatternsPage onBack={() => setCurrentPage('home')} />
                 <BottomNav currentPage={currentPage} onNavigate={setCurrentPage} />
             </>
         )

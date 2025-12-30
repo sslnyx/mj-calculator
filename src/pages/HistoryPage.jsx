@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { ArrowLeft, Clock } from 'lucide-react'
+import { ArrowLeft, Clock, Eye } from 'lucide-react'
 import { getPlayerAvatar } from '../lib/avatar'
 import { getFirstName } from '../lib/names'
+import MatchDetailsModal from '../components/MatchDetailsModal'
 
 const HistoryPage = ({ onBack }) => {
     const { player } = useAuth()
     const [matches, setMatches] = useState([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
+    const [selectedMatch, setSelectedMatch] = useState(null)
 
     const fetchHistory = async (showRefresh = false) => {
         if (!player) return
@@ -188,26 +190,36 @@ const HistoryPage = ({ onBack }) => {
                                 {/* Round Details */}
                                 {match.rounds.length > 0 && (
                                     <div className="mt-3 pt-3 border-t border-gray-200">
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {match.rounds.slice(0, 5).map((round, i) => {
-                                                const isWin = round.winner_id === player.id
-                                                return (
-                                                    <span
-                                                        key={round.id}
-                                                        className={`text-sm font-bold px-2.5 py-1 rounded border-2 ${isWin
-                                                            ? 'bg-green/20 border-green text-green-bold'
-                                                            : 'bg-red/20 border-red text-red-bold'
-                                                            }`}
-                                                    >
-                                                        {isWin ? '勝' : '負'} {round.fan_count}番
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap gap-1.5 flex-1">
+                                                {match.rounds.slice(0, 4).map((round, i) => {
+                                                    const isWin = round.winner_id === player.id
+                                                    return (
+                                                        <span
+                                                            key={round.id}
+                                                            className={`text-sm font-bold px-2.5 py-1 rounded border-2 ${isWin
+                                                                ? 'bg-green/20 border-green text-green-bold'
+                                                                : 'bg-red/20 border-red text-red-bold'
+                                                                }`}
+                                                        >
+                                                            {isWin ? '勝' : '負'} {round.fan_count}番
+                                                        </span>
+                                                    )
+                                                })}
+                                                {match.rounds.length > 4 && (
+                                                    <span className="text-sm text-gray-400 self-center">
+                                                        +{match.rounds.length - 4}
                                                     </span>
-                                                )
-                                            })}
-                                            {match.rounds.length > 5 && (
-                                                <span className="text-sm text-gray-400 self-center">
-                                                    +{match.rounds.length - 5} more
-                                                </span>
-                                            )}
+                                                )}
+                                            </div>
+                                            {/* View Details Button */}
+                                            <button
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-cyan border-2 border-black rounded-lg font-bold text-sm shadow-comic-sm hover:bg-cyan/80 transition-colors cursor-pointer"
+                                                onClick={() => setSelectedMatch(match)}
+                                            >
+                                                <Eye size={16} />
+                                                詳情
+                                            </button>
                                         </div>
                                     </div>
                                 )}
@@ -216,6 +228,14 @@ const HistoryPage = ({ onBack }) => {
                     </div>
                 )}
             </div>
+
+            {/* Match Details Modal */}
+            <MatchDetailsModal
+                isOpen={!!selectedMatch}
+                onClose={() => setSelectedMatch(null)}
+                match={selectedMatch}
+                currentPlayerId={player?.id}
+            />
         </div>
     )
 }

@@ -1,9 +1,10 @@
-import { Home, Trophy, User, Clock } from 'lucide-react'
+import { Home, Trophy, User, Clock, Info } from 'lucide-react'
 
 const BottomNav = ({ currentPage, onNavigate }) => {
     const navItems = [
         { id: 'home', label: '大廳', icon: Home },
         { id: 'rankings', label: '排行', icon: Trophy },
+        { id: 'patterns', label: '牌型', icon: Info },
         { id: 'profile', label: '我的', icon: User },
         { id: 'history', label: '歷史', icon: Clock }
     ]
@@ -14,8 +15,8 @@ const BottomNav = ({ currentPage, onNavigate }) => {
                 <button
                     key={item.id}
                     className={`flex flex-col items-center justify-center gap-0.5 py-2 px-4 bg-transparent border-none cursor-pointer transition-all duration-150 ${currentPage === item.id
-                            ? 'text-orange scale-110'
-                            : 'text-gray-500 hover:text-black'
+                        ? 'text-orange scale-110'
+                        : 'text-gray-500 hover:text-black'
                         }`}
                     onClick={() => onNavigate(item.id)}
                 >

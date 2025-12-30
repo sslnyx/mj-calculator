@@ -14,6 +14,7 @@ export default {
         pink: '#FF85C1',
         red: '#FF0055',
         green: '#33FF33',
+        purple: '#9333EA',
         // Neutrals
         black: '#000000',
         white: '#FFFFFF',

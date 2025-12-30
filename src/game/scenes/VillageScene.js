@@ -22,13 +22,37 @@ export default class VillageScene extends Phaser.Scene {
         const scale = Math.max(scaleX, scaleY)
         bg.setScale(scale)
 
-        // Create player character using individual texture
-        this.player = this.add.image(
+        // Create player character using idle sprite sheet initially
+        this.player = this.add.sprite(
             this.cameras.main.width / 2,
             this.cameras.main.height / 2,
-            `char_${this.currentCharacter}`
+            'test_sheet_idle'
         )
-        this.player.setScale(0.5) // Scale down since characters are large
+        this.player.setScale(0.3) // Scale down
+
+        // Define Idle Animation (3 frames)
+        if (!this.anims.exists('idle')) {
+            this.anims.create({
+                key: 'idle',
+                frames: this.anims.generateFrameNumbers('test_sheet_idle', { start: 0, end: 2 }),
+                frameRate: 4, // Slower for idle
+                repeat: -1,
+                yoyo: true // Ping-pong effect for smoother breathing
+            })
+        }
+
+        // Define Walk Animation (6 frames)
+        if (!this.anims.exists('walk')) {
+            this.anims.create({
+                key: 'walk',
+                frames: this.anims.generateFrameNumbers('test_sheet_walk', { start: 0, end: 5 }),
+                frameRate: 10,
+                repeat: -1
+            })
+        }
+
+        // Start idle
+        this.player.anims.play('idle')
 
         // Make player interactive
         this.player.setInteractive()
@@ -127,6 +151,21 @@ export default class VillageScene extends Phaser.Scene {
         const deltaTime = this.game.loop.delta / 1000
         this.player.x += velocityX * deltaTime
         this.player.y += velocityY * deltaTime
+
+        // Handle walking animation
+        const isMoving = velocityX !== 0 || velocityY !== 0
+
+        if (isMoving) {
+            // Play walk animation if shorter duration or if different
+            if (this.player.anims.currentAnim?.key !== 'walk') {
+                this.player.anims.play('walk', true)
+            }
+        } else {
+            // Play idle animation
+            if (this.player.anims.currentAnim?.key !== 'idle') {
+                this.player.anims.play('idle', true)
+            }
+        }
 
         // Keep player in bounds
         this.player.x = Phaser.Math.Clamp(this.player.x, 50, this.cameras.main.width - 50)

@@ -43,8 +43,22 @@ export default class PreloadScene extends Phaser.Scene {
 
         // Load character sheet as regular image (we'll crop manually)
         this.load.image('character_sheet', '/game/sprites/characters.png')
-    }
 
+        // Load test character (c1/rb.png)
+        this.load.image('test_char', '/game/sprites/c1_rb.png')
+
+        // Load test sprite sheet (c1-stand.png) - 3 frames
+        this.load.spritesheet('test_sheet_idle', '/game/sprites/c1_stand.png', {
+            frameWidth: 217,
+            frameHeight: 470
+        })
+
+        // Load test sprite sheet (c1-walk.png) - 6 frames (2 columns x 3 rows)
+        this.load.spritesheet('test_sheet_walk', '/game/sprites/c1_walk.png', {
+            frameWidth: 344,
+            frameHeight: 517
+        })
+    }
     create() {
         // Create texture frames from the character sheet
         // The image is 1024x512 with characters arranged irregularly

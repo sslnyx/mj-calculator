@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Info } from 'lucide-react'
 import { getPointsForFan, recordDirectWin, recordZimo } from '../lib/scoring'
 
 // Extended Fan options (0-13)
@@ -7,30 +8,40 @@ const FAN_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 // Hand patterns with their default fan values
 // hasBao: true = this hand CAN trigger 包 (bao) responsibility
 const HAND_PATTERNS = {
-    // Regular Hands
+    // Regular Hands (standalone patterns)
     regular: [
+        { id: 'da_san_yuan', name: '大三元', fan: 8 },
         { id: 'qing_yi_se', name: '清一色', fan: 7 },
         { id: 'xiao_san_yuan', name: '小三元', fan: 5 },
+        { id: 'hua_yao_jiu', name: '花么九', fan: 4 },
         { id: 'hun_yi_se', name: '混一色', fan: 3 },
         { id: 'dui_dui_hu', name: '對對糊', fan: 3 },
-        { id: 'ping_hu', name: '平糊', fan: 1 },
-        { id: 'hua_hu', name: '花糊', fan: 3 },
     ],
     // Limit Hands - hasBao indicates if 包 can apply
     limit: [
+        { id: 'tian_hu', name: '天胡', fan: 13, isLimit: true, hasBao: false },
+        { id: 'di_hu', name: '地胡', fan: 13, isLimit: true, hasBao: false },
         { id: 'shi_san_yao', name: '十三幺', fan: 13, isLimit: true, hasBao: false },
         { id: 'jiu_lian_bao_deng', name: '九蓮寶燈', fan: 13, isLimit: true, hasBao: false },
         { id: 'da_si_xi', name: '大四喜', fan: 13, isLimit: true, hasBao: true },
-        { id: 'da_san_yuan', name: '大三元', fan: 13, isLimit: true, hasBao: true },
+        { id: 'xiao_si_xi', name: '小四喜', fan: 13, isLimit: true, hasBao: true },
         { id: 'zi_yi_se', name: '字一色', fan: 13, isLimit: true, hasBao: true },
+        { id: 'qing_yao_jiu', name: '清么九', fan: 13, isLimit: true, hasBao: false },
         { id: 'kan_kan_hu', name: '坎坎胡', fan: 13, isLimit: true, hasBao: false },
+        { id: 'shi_ba_luo_han', name: '十八羅漢', fan: 13, isLimit: true, hasBao: false },
+        { id: 'ba_xian_guo_hai', name: '八仙過海', fan: 13, isLimit: true, hasBao: false },
     ],
-    // Bonus conditions (add-ons)
+    // Bonus conditions (add-ons that stack with other hands)
     bonus: [
+        { id: 'hua_hu', name: '花糊', fan: 3 },
+        { id: 'yi_tai_hua', name: '一臺花', fan: 2 },
+        { id: 'gang_shang_hua', name: '槓上開花', fan: 2 },
+        { id: 'ping_hu', name: '平糊', fan: 1 },
+        { id: 'men_qian_qing', name: '門前清', fan: 1 },
+        { id: 'zheng_hua', name: '正花', fan: 1 },
         { id: 'wu_hua', name: '無花', fan: 1 },
         { id: 'fan_zi', name: '番子', fan: 1 },
         { id: 'qiang_gang', name: '搶槓', fan: 1 },
-        { id: 'gang_shang_hua', name: '槓上開花', fan: 1 },
         { id: 'hai_di_lao_yue', name: '海底撈月', fan: 1 },
     ]
 }
@@ -42,6 +53,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
     const [fanCount, setFanCount] = useState(3)
     const [selectedPatterns, setSelectedPatterns] = useState([])
     const [fanZiCount, setFanZiCount] = useState(0) // Counter for 番子 (can be 0-4)
+    const [zhengHuaCount, setZhengHuaCount] = useState(0) // Counter for 正花 (can be 0-2)
     const [patternTab, setPatternTab] = useState('regular') // 'regular' or 'limit'
     const [showRareAddons, setShowRareAddons] = useState(false) // Collapse rare add-ons
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -49,7 +61,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
 
     // Calculate total fan from selected patterns
     const calculatedFan = useMemo(() => {
-        if (selectedPatterns.length === 0 && fanZiCount === 0) return null
+        if (selectedPatterns.length === 0 && fanZiCount === 0 && zhengHuaCount === 0) return null
 
         // Check if any limit hand is selected
         const hasLimit = selectedPatterns.some(id =>
@@ -61,14 +73,15 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
         let total = 0
         const allPatterns = [...HAND_PATTERNS.regular, ...HAND_PATTERNS.bonus]
         selectedPatterns.forEach(id => {
-            // Skip fan_zi since we handle it separately
-            if (id === 'fan_zi') return
+            // Skip fan_zi and zheng_hua since we handle them separately with counters
+            if (id === 'fan_zi' || id === 'zheng_hua') return
             const pattern = allPatterns.find(p => p.id === id)
             if (pattern) total += pattern.fan
         })
 
-        // Add fanZiCount
+        // Add fanZiCount and zhengHuaCount
         total += fanZiCount
+        total += zhengHuaCount
 
         // Add +1 fan bonus for zi-mo (自摸) or bao zi-mo (包自摸)
         if (winType === 'zimo' || winType === 'zimo_bao') {
@@ -76,7 +89,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
         }
 
         return Math.min(total, 13)
-    }, [selectedPatterns, fanZiCount, winType])
+    }, [selectedPatterns, fanZiCount, zhengHuaCount, winType])
 
     // Sync fan count when patterns change
     const effectiveFan = calculatedFan !== null ? calculatedFan : fanCount
@@ -136,6 +149,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
             setFanCount(3)
             setSelectedPatterns([])
             setFanZiCount(0)
+            setZhengHuaCount(0)
             onSuccess?.()
             onClose()
         } catch (err) {
@@ -151,6 +165,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
         setFanCount(3)
         setSelectedPatterns([])
         setFanZiCount(0)
+        setZhengHuaCount(0)
         setPatternTab('regular')
         setError(null)
         onClose()
@@ -295,7 +310,17 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
 
                     {/* Hand Pattern Selection */}
                     <div>
-                        <label className="block font-bold text-sm mb-2 uppercase">牌型 (Hand Patterns)</label>
+                        <label className="block font-bold text-sm mb-2 uppercase flex items-center gap-2">
+                            牌型 (Hand Patterns)
+                            <button
+                                type="button"
+                                className="w-5 h-5 bg-cyan rounded-full flex items-center justify-center border border-black hover:bg-cyan/80"
+                                onClick={() => window.location.hash = '#patterns'}
+                                title="查看所有牌型"
+                            >
+                                <Info size={12} />
+                            </button>
+                        </label>
 
                         {/* Tabs for Regular / Limit */}
                         <div className="flex gap-1 mb-2">
@@ -378,20 +403,64 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                                 </div>
                             </div>
 
+                            {/* 正花 Counter */}
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold text-sm">正花</span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
+                                        onClick={() => setZhengHuaCount(prev => Math.max(0, prev - 1))}
+                                        disabled={zhengHuaCount === 0}
+                                    >
+                                        ◀
+                                    </button>
+                                    <span className="w-6 text-center font-title text-lg">{zhengHuaCount}</span>
+                                    <button
+                                        className="w-8 h-8 rounded border-comic-thin bg-white font-bold disabled:opacity-50"
+                                        onClick={() => setZhengHuaCount(prev => Math.min(2, prev + 1))}
+                                        disabled={zhengHuaCount === 2}
+                                    >
+                                        ▶
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Common add-ons (always visible) */}
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <button
+                                    className={`py-2 px-2 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes('ping_hu')
+                                        ? 'bg-yellow shadow-comic-sm'
+                                        : 'bg-white hover:bg-gray-100'
+                                        }`}
+                                    onClick={() => handlePatternToggle('ping_hu')}
+                                >
+                                    平糊 <span className="text-gray-500">+1</span>
+                                </button>
+                                <button
+                                    className={`py-2 px-2 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes('men_qian_qing')
+                                        ? 'bg-yellow shadow-comic-sm'
+                                        : 'bg-white hover:bg-gray-100'
+                                        }`}
+                                    onClick={() => handlePatternToggle('men_qian_qing')}
+                                >
+                                    門清 <span className="text-gray-500">+1</span>
+                                </button>
+                            </div>
+
                             {/* Rare add-ons - Collapsible */}
                             <button
                                 className="w-full text-left text-xs font-bold text-gray-500 flex items-center gap-1"
                                 onClick={() => setShowRareAddons(!showRareAddons)}
                             >
                                 其他附加 {showRareAddons ? '▲' : '▼'}
-                                {selectedPatterns.some(id => ['wu_hua', 'qiang_gang', 'gang_shang_hua', 'hai_di_lao_yue'].includes(id)) && (
+                                {selectedPatterns.some(id => ['wu_hua', 'qiang_gang', 'gang_shang_hua', 'hai_di_lao_yue', 'hua_hu', 'yi_tai_hua'].includes(id)) && (
                                     <span className="text-orange">•</span>
                                 )}
                             </button>
 
                             {showRareAddons && (
                                 <div className="grid grid-cols-2 gap-2 mt-2">
-                                    {HAND_PATTERNS.bonus.filter(p => p.id !== 'fan_zi').map(p => (
+                                    {HAND_PATTERNS.bonus.filter(p => !['fan_zi', 'zheng_hua', 'ping_hu', 'men_qian_qing'].includes(p.id)).map(p => (
                                         <button
                                             key={p.id}
                                             className={`py-2 px-2 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes(p.id)
@@ -447,7 +516,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess }) => {
                     {isSubmitting ? 'SAVING...' : 'CONFIRM!'}
                 </button>
             </div>
-        </div>
+        </div >
     )
 }
 
