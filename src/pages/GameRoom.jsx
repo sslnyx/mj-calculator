@@ -208,13 +208,13 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                 modules={[Pagination]}
                 pagination={{ clickable: true }}
                 onSwiper={(swiper) => { swiperRef.current = swiper }}
-                className="flex-1 w-full pb-8 [&_.swiper-pagination]:bottom-0 [&_.swiper-pagination-bullet]:w-3 [&_.swiper-pagination-bullet]:h-3 [&_.swiper-pagination-bullet]:bg-white [&_.swiper-pagination-bullet]:border-2 [&_.swiper-pagination-bullet]:border-black [&_.swiper-pagination-bullet]:opacity-100 [&_.swiper-pagination-bullet]:mx-1.5 [&_.swiper-pagination-bullet-active]:!bg-cyan [&_.swiper-pagination-bullet-active]:scale-125"
+                className="flex-1 w-full pb-8 [&_.swiper-pagination]:bottom-0 [&_.swiper-pagination-bullet]:w-3 [&_.swiper-pagination-bullet]:h-3 [&_.swiper-pagination-bullet]:bg-white [&_.swiper-pagination-bullet]:border-2 [&_.swiper-pagination-bullet]:border-black [&_.swiper-pagination-bullet]:opacity-100 [&_.swiper-pagination-bullet]:mx-3 [&_.swiper-pagination-bullet-active]:!bg-cyan [&_.swiper-pagination-bullet-active]:scale-125"
                 spaceBetween={0}
                 slidesPerView={1}
             >
                 {/* Slide 1: Players */}
                 <SwiperSlide>
-                    <section className="h-full p-4 pb-8 grid grid-cols-2 grid-rows-2 gap-3">
+                    <section className="h-full p-4 pb-12 grid grid-cols-2 grid-rows-2 gap-3">
                         {[1, 2, 3, 4].map(seat => {
                             const playerInSeat = sortedPlayers.find(p => p.seat_position === seat)
                             return (
@@ -260,7 +260,7 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
 
                 {/* Slide 2: Score Table */}
                 <SwiperSlide>
-                    <section className="h-full flex flex-col p-4 pb-8">
+                    <section className="h-full flex flex-col p-4 pb-12">
                         {/* <h3 className="font-title text-xl mb-3 shrink-0">SCORE TABLE</h3> */}
                         <div className="flex-1 min-h-0 bg-white border-comic-thin rounded-lg shadow-comic-sm overflow-hidden">
                             <ScoreTable
@@ -274,7 +274,7 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
 
                 {/* Slide 3: Game Log (History) */}
                 <SwiperSlide>
-                    <section className="h-full flex flex-col p-4 pb-8">
+                    <section className="h-full flex flex-col p-4 pb-12">
                         <h3 className="font-title text-xl mb-3 shrink-0">GAME LOG</h3>
                         <div className="flex-1 overflow-hidden">
                             <GameLog
