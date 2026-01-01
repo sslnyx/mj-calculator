@@ -36,6 +36,7 @@ const PATTERNS_DATA = {
         { id: 'wu_hua', name: '無花', fan: 1, desc: '全局沒有收到任何花牌' },
         { id: 'fan_zi', name: '番子', fan: 1, desc: '有三元牌或風牌的刻子（東/南/西/北/中/發/白）' },
         { id: 'qiang_gang', name: '搶槓', fan: 1, desc: '別人加槓時，截糊該張牌。只適用於加槓，算放銃由加槓者賠' },
+        { id: 'yao_jiu', name: '幺九', fan: 1, desc: '刻子都是么九牌（1或9）或字牌' },
         { id: 'hai_di_lao_yue', name: '海底撈月', fan: 1, desc: '摸最後一張牌胡牌' },
     ]
 }

@@ -449,6 +449,7 @@ const ProfilePage = ({ playerId, onBack }) => {
                                             wu_hua: '無花',
                                             fan_zi: '番子',
                                             qiang_gang: '搶槓',
+                                            yao_jiu: '幺九',
                                             gang_shang_hua: '槓上開花',
                                             hai_di_lao_yue: '海底撈月'
                                         }

@@ -38,6 +38,7 @@ const PATTERN_NAMES = {
     fan_zi: '番子',
     qiang_gang: '搶槓',
     gang_shang_hua: '槓上開花',
+    yao_jiu: '幺九',
     hai_di_lao_yue: '海底撈月'
 }
 

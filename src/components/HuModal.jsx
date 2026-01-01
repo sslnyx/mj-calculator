@@ -42,6 +42,7 @@ const HAND_PATTERNS = {
         { id: 'wu_hua', name: '無花', fan: 1 },
         { id: 'fan_zi', name: '番子', fan: 1 },
         { id: 'qiang_gang', name: '搶槓', fan: 1 },
+        { id: 'yao_jiu', name: '幺九', fan: 1 },
         { id: 'hai_di_lao_yue', name: '海底撈月', fan: 1 },
     ]
 }
@@ -117,10 +118,10 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                 return [...withoutLimits, patternId]
             }
 
-            // If selecting a limit pattern, clear all regular patterns first
+            // If selecting a limit pattern, clear all regular patterns and other limit patterns first
             if (isLimitPattern) {
-                const withoutRegulars = prev.filter(id => !regularPatternIds.includes(id))
-                return [...withoutRegulars, patternId]
+                const filtered = prev.filter(id => !regularPatternIds.includes(id) && !limitPatternIds.includes(id))
+                return [...filtered, patternId]
             }
 
             // For bonus patterns, just add
@@ -222,6 +223,10 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
         // 大三元 and 小三元 are mutually exclusive (can't have both)
         if (patternId === 'da_san_yuan' && selectedPatterns.includes('xiao_san_yuan')) return true
         if (patternId === 'xiao_san_yuan' && selectedPatterns.includes('da_san_yuan')) return true
+
+        // 花幺九 (Mixed Terminals) vs 三元 (Dragons) - mutually exclusive
+        if (patternId === 'hua_yao_jiu' && (selectedPatterns.includes('da_san_yuan') || selectedPatterns.includes('xiao_san_yuan'))) return true
+        if ((patternId === 'da_san_yuan' || patternId === 'xiao_san_yuan') && selectedPatterns.includes('hua_yao_jiu')) return true
 
         // 清一色 (pure suit) is mutually exclusive with patterns requiring honors:
         // - 大三元/小三元 (need dragons)
