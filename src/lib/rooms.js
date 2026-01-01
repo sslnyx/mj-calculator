@@ -366,10 +366,14 @@ export const joinAsSpectator = async (roomCode, playerId) => {
 
 // Leave a room
 export const leaveRoom = async (roomId, playerId) => {
-    // First, get the player's current seat and points
+    // First, get the player's current seat, points, and name
     const { data: playerData } = await supabase
         .from('room_players')
-        .select('seat_position, current_points')
+        .select(`
+            seat_position, 
+            current_points,
+            player:players (id, display_name)
+        `)
         .eq('room_id', roomId)
         .eq('player_id', playerId)
         .single()
@@ -381,14 +385,16 @@ export const leaveRoom = async (roomId, playerId) => {
         .eq('id', roomId)
         .single()
 
-    // If game is active and player has points, save to vacated_seats
-    if (roomData?.status === 'active' && playerData) {
+    // If game is active and player has a seat, save to vacated_seats with player info
+    if (roomData?.status === 'active' && playerData?.seat_position) {
         await supabase
             .from('vacated_seats')
             .upsert({
                 room_id: roomId,
                 seat_position: playerData.seat_position,
-                current_points: playerData.current_points
+                current_points: playerData.current_points || 0,
+                player_id: playerId,
+                player_name: playerData.player?.display_name || 'Unknown Player'
             }, {
                 onConflict: 'room_id,seat_position'
             })
@@ -452,13 +458,35 @@ export const endGame = async (roomId) => {
 
     // Build final_scores object by seat
     const finalScores = {}
+    const occupiedSeats = new Set()
+
     if (roomPlayers) {
         roomPlayers.forEach(rp => {
             if (rp.seat_position) {
+                occupiedSeats.add(rp.seat_position)
                 finalScores[`seat${rp.seat_position}`] = {
                     player_id: rp.player?.id,
                     player_name: rp.player?.display_name,
                     points: rp.current_points || 0
+                }
+            }
+        })
+    }
+
+    // Also fetch vacated seats (players who left) for seats not currently occupied
+    const { data: vacatedSeats } = await supabase
+        .from('vacated_seats')
+        .select('seat_position, current_points, player_id, player_name')
+        .eq('room_id', roomId)
+
+    if (vacatedSeats) {
+        vacatedSeats.forEach(vs => {
+            // Only add if this seat is not currently occupied by another player
+            if (vs.seat_position && !occupiedSeats.has(vs.seat_position)) {
+                finalScores[`seat${vs.seat_position}`] = {
+                    player_id: vs.player_id,
+                    player_name: vs.player_name || 'Unknown Player',
+                    points: vs.current_points || 0
                 }
             }
         })

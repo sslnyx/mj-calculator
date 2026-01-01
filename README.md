@@ -130,8 +130,35 @@ PONPONMANIA uses a **pop-art/comic** aesthetic inspired by SuperDesign:
 2. Select the winner
 3. Choose win type (Eat or Zimo)
 4. If Eat or Zimo Bao, select the loser
-5. Select the fan count
+5. Select hand patterns (optional - auto-calculates fan)
 6. Confirm to record the round
+
+## 🀄 Hand Patterns & Fan Values
+
+### Regular Hands (常規)
+| Pattern | Name | Fan |
+|---------|------|-----|
+| 大三元 | Big Three Dragons | 8 |
+| 清一色 | Pure One Suit | 7 |
+| 小三元 | Small Three Dragons | 5 |
+| 花么九 | Mixed Terminals | 4 |
+| 混一色 | Half Flush | 3 |
+| 對對糊 | All Triplets | 3 |
+
+### Mutual Exclusivity Rules
+Certain patterns cannot be selected together:
+
+| Pattern | Conflicts With | Reason |
+|---------|---------------|--------|
+| 大三元 | 小三元 | Can't have both big and small three dragons |
+| 大三元 | 清一色 | Dragons are honor tiles |
+| 小三元 | 清一色 | Dragons are honor tiles |
+| 清一色 | 混一色 | Pure suit vs suit + honors |
+| 清一色 | 花么九 | Terminals require multiple suits |
+| 混一色 | 花么九 | One suit vs multiple suits |
+| 花么九 | 對對糊 | 花么九 already implies all triplets |
+| 對對糊 | 平糊 | All triplets vs all sequences |
+| 包自摸 (win type) | 門清 | Bao responsibility conflicts with concealed hand |
 
 ### Viewing Game Log
 1. Swipe left on the game screen

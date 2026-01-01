@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { createRoom, joinRoom as joinTableService, joinAsSpectator } from '../lib/rooms'
+import { createRoom, joinRoom as joinTableService, joinAsSpectator, endGame } from '../lib/rooms'
 import GameRoom from './GameRoom'
 import ProfilePage from './ProfilePage'
 import RankingsPage from './RankingsPage'
@@ -21,6 +21,7 @@ const Dashboard = () => {
     const [error, setError] = useState(null)
     const [isCreating, setIsCreating] = useState(false)
     const [archiveConfirm, setArchiveConfirm] = useState(null) // tableId to archive
+    const [deleteConfirm, setDeleteConfirm] = useState(null) // tableId to delete
 
     const isAdmin = player?.is_admin === true
     const deletingRef = useRef(false)
@@ -120,42 +121,8 @@ const Dashboard = () => {
         setArchiveConfirm(null)
 
         try {
-            // First, get current scores from room_players before deleting
-            const { data: roomPlayers } = await supabase
-                .from('room_players')
-                .select(`
-                    seat_position,
-                    current_points,
-                    is_spectator,
-                    player:players (id, display_name)
-                `)
-                .eq('room_id', tableId)
-                .eq('is_spectator', false)
-                .order('seat_position')
-
-            // Build final_scores object by seat
-            const finalScores = {}
-            if (roomPlayers) {
-                roomPlayers.forEach(rp => {
-                    if (rp.seat_position) {
-                        finalScores[`seat${rp.seat_position}`] = {
-                            player_id: rp.player?.id,
-                            player_name: rp.player?.display_name,
-                            points: rp.current_points || 0
-                        }
-                    }
-                })
-            }
-
-            // Update game room with final scores and completed status
-            await supabase
-                .from('game_rooms')
-                .update({
-                    status: 'completed',
-                    ended_at: new Date().toISOString(),
-                    final_scores: Object.keys(finalScores).length > 0 ? finalScores : null
-                })
-                .eq('id', tableId)
+            // Use the shared endGame function from rooms.js
+            await endGame(tableId)
 
             // Then remove all players
             await supabase
@@ -172,6 +139,49 @@ const Dashboard = () => {
     const handleLeaveTable = () => {
         setCurrentTable(null)
         setError(null)
+    }
+
+    const handleDeleteClick = (tableId) => {
+        if (!isAdmin) return
+        setDeleteConfirm(tableId)
+    }
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirm || deletingRef.current) return
+
+        deletingRef.current = true
+        const tableId = deleteConfirm
+        setDeleteConfirm(null)
+
+        try {
+            // Delete all game rounds for this room
+            await supabase
+                .from('game_rounds')
+                .delete()
+                .eq('room_id', tableId)
+
+            // Delete all vacated seats for this room
+            await supabase
+                .from('vacated_seats')
+                .delete()
+                .eq('room_id', tableId)
+
+            // Delete all room players
+            await supabase
+                .from('room_players')
+                .delete()
+                .eq('room_id', tableId)
+
+            // Delete the game room itself
+            await supabase
+                .from('game_rooms')
+                .delete()
+                .eq('id', tableId)
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            deletingRef.current = false
+        }
     }
 
     if (loading) {
@@ -379,6 +389,15 @@ const Dashboard = () => {
                                                     📦
                                                 </button>
                                             )}
+                                            {isAdmin && (
+                                                <button
+                                                    className="bg-white border-comic-thin p-2 rounded-md cursor-pointer shadow-comic-sm transition-all duration-150 hover:bg-red hover:text-white"
+                                                    onClick={() => handleDeleteClick(table.id)}
+                                                    title="刪除牌局"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -395,6 +414,15 @@ const Dashboard = () => {
                 message="結束呢個牌局? 最終成績會被保存。"
                 onConfirm={handleArchiveConfirm}
                 onCancel={() => setArchiveConfirm(null)}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={deleteConfirm !== null}
+                title="刪除牌局"
+                message="⚠️ 完全刪除呢個牌局? 所有數據將被永久刪除，無法恢復!"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => setDeleteConfirm(null)}
             />
 
             {/* Fixed Bottom Navigation */}

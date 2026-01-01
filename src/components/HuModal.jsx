@@ -50,12 +50,13 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
     const [winType, setWinType] = useState('eat') // 'eat', 'zimo', or 'zimo_bao'
     const [winnerId, setWinnerId] = useState(null)
     const [loserId, setLoserId] = useState(null)
-    const [fanCount, setFanCount] = useState(3)
+    const [fanCount, setFanCount] = useState(0)
     const [selectedPatterns, setSelectedPatterns] = useState([])
     const [fanZiCount, setFanZiCount] = useState(0) // Counter for 番子 (can be 0-4)
     const [zhengHuaCount, setZhengHuaCount] = useState(0) // Counter for 正花 (can be 0-2)
     const [patternTab, setPatternTab] = useState('regular') // 'regular' or 'limit'
     const [showRareAddons, setShowRareAddons] = useState(false) // Collapse rare add-ons
+    const [showManualFan, setShowManualFan] = useState(false) // Collapse manual fan input
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState(null)
 
@@ -92,16 +93,38 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
     }, [selectedPatterns, fanZiCount, zhengHuaCount, winType])
 
     // Sync fan count when patterns change
-    const effectiveFan = calculatedFan !== null ? calculatedFan : fanCount
+    const effectiveFan = calculatedFan !== null
+        ? calculatedFan
+        : fanCount
 
     if (!isOpen) return null
 
     const handlePatternToggle = (patternId) => {
+        const regularPatternIds = HAND_PATTERNS.regular.map(p => p.id)
+        const limitPatternIds = HAND_PATTERNS.limit.map(p => p.id)
+        const isRegularPattern = regularPatternIds.includes(patternId)
+        const isLimitPattern = limitPatternIds.includes(patternId)
+
         setSelectedPatterns(prev => {
-            const newPatterns = prev.includes(patternId)
-                ? prev.filter(id => id !== patternId)
-                : [...prev, patternId]
-            return newPatterns
+            // If toggling off, just remove it
+            if (prev.includes(patternId)) {
+                return prev.filter(id => id !== patternId)
+            }
+
+            // If selecting a regular pattern, clear all limit patterns first
+            if (isRegularPattern) {
+                const withoutLimits = prev.filter(id => !limitPatternIds.includes(id))
+                return [...withoutLimits, patternId]
+            }
+
+            // If selecting a limit pattern, clear all regular patterns first
+            if (isLimitPattern) {
+                const withoutRegulars = prev.filter(id => !regularPatternIds.includes(id))
+                return [...withoutRegulars, patternId]
+            }
+
+            // For bonus patterns, just add
+            return [...prev, patternId]
         })
     }
 
@@ -184,9 +207,44 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
         return `${effectiveFan}番 = ${points}分`
     }
 
-    // Check if a limit hand should be disabled (when zimo_bao is selected but hand has no bao)
+    // Check if a limit hand should be disabled
     const isLimitDisabled = (pattern) => {
-        return winType === 'zimo_bao' && !pattern.hasBao
+        // When zimo_bao is selected, only show hands that can trigger Bao
+        if (winType === 'zimo_bao' && !pattern.hasBao) return true
+        return false
+    }
+
+    // Mutual exclusivity rules for regular patterns
+    const isRegularDisabled = (patternId) => {
+
+        // 大三元 and 小三元 are mutually exclusive (can't have both)
+        if (patternId === 'da_san_yuan' && selectedPatterns.includes('xiao_san_yuan')) return true
+        if (patternId === 'xiao_san_yuan' && selectedPatterns.includes('da_san_yuan')) return true
+
+        // 清一色 (pure suit) is mutually exclusive with patterns requiring honors:
+        // - 大三元/小三元 (need dragons)
+        // - 混一色 (one suit + honors)
+        // - 花么九 (terminals + honors)
+        const qingYiSeConflicts = ['da_san_yuan', 'xiao_san_yuan', 'hun_yi_se', 'hua_yao_jiu']
+        if (patternId === 'qing_yi_se' && qingYiSeConflicts.some(id => selectedPatterns.includes(id))) return true
+        if (qingYiSeConflicts.includes(patternId) && selectedPatterns.includes('qing_yi_se')) return true
+
+        // 混一色 (one suit + honors) vs 花么九 (terminals from ALL suits + honors)
+        if (patternId === 'hun_yi_se' && selectedPatterns.includes('hua_yao_jiu')) return true
+        if (patternId === 'hua_yao_jiu' && selectedPatterns.includes('hun_yi_se')) return true
+
+        // 花么九 already implies 對對糊 (can't have sequences with only 1s/9s)
+        if (patternId === 'hua_yao_jiu' && selectedPatterns.includes('dui_dui_hu')) return true
+        if (patternId === 'dui_dui_hu' && selectedPatterns.includes('hua_yao_jiu')) return true
+
+        // 對對糊 (all triplets) vs 平糊 (all sequences) - mutually exclusive
+        if (patternId === 'dui_dui_hu' && selectedPatterns.includes('ping_hu')) return true
+        if (patternId === 'ping_hu' && selectedPatterns.includes('dui_dui_hu')) return true
+
+        // 包自摸 win type is exclusive with 門清 (concealed hand)
+        if (patternId === 'men_qian_qing' && winType === 'zimo_bao') return true
+
+        return false
     }
 
     return (
@@ -224,30 +282,40 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                         <div className="flex items-center justify-between mb-2">
                             <label className="font-bold text-sm uppercase">邊個食糊?</label>
                             {/* Win Type Toggle - 自摸/包自摸 tabs */}
-                            <div className="flex gap-1 bg-green/20 p-1 rounded-lg">
-                                {[
-                                    { type: 'zimo', label: '自摸' },
-                                    { type: 'zimo_bao', label: '包自摸' }
-                                ].map(({ type, label }) => (
-                                    <button
-                                        key={type}
-                                        className={`py-1 px-2 rounded-md font-bold text-xs transition-all ${winType === type
-                                            ? 'bg-green shadow-comic-sm'
-                                            : 'bg-transparent hover:bg-white/50'
-                                            }`}
-                                        onClick={() => {
-                                            // Toggle off if already selected, otherwise select
-                                            if (winType === type) {
-                                                setWinType('eat')
-                                            } else {
-                                                setWinType(type)
-                                            }
-                                            setLoserId(null)
-                                        }}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
+                            <div className="flex gap-2">
+                                <button
+                                    className={`py-2 px-4 rounded-lg font-bold text-base transition-all border-2 ${winType === 'zimo'
+                                        ? 'bg-green border-black shadow-comic-sm'
+                                        : 'bg-white/80 border-green/50 hover:bg-green/20'
+                                        }`}
+                                    onClick={() => {
+                                        if (winType === 'zimo') {
+                                            setWinType('eat')
+                                        } else {
+                                            setWinType('zimo')
+                                        }
+                                        setLoserId(null)
+                                    }}
+                                >
+                                    自摸
+                                </button>
+                                <button
+                                    className={`py-2 px-4 rounded-lg font-bold text-base transition-all border-2 ${winType === 'zimo_bao'
+                                        ? 'bg-gradient-to-r from-pink via-red to-orange border-black shadow-comic-sm'
+                                        : 'bg-white/80 border-red/50 hover:bg-red/20'
+                                        }`}
+                                    onClick={() => {
+                                        if (winType === 'zimo_bao') {
+                                            // Keep the loser as the 出銃 person
+                                            setWinType('eat')
+                                        } else {
+                                            // Keep the loser as the 包 responsible person
+                                            setWinType('zimo_bao')
+                                        }
+                                    }}
+                                >
+                                    🔥 包自摸
+                                </button>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -256,9 +324,12 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                                     key={p.player_id}
                                     className={`py-3 px-2 rounded-lg border-comic-thin font-bold text-sm transition-all ${winnerId === p.player_id
                                         ? 'bg-green shadow-comic-sm scale-105'
-                                        : 'bg-white hover:bg-gray-100'
+                                        : p.player_id === loserId
+                                            ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                                            : 'bg-white hover:bg-gray-100'
                                         }`}
-                                    onClick={() => setWinnerId(p.player_id)}
+                                    onClick={() => p.player_id !== loserId && setWinnerId(p.player_id)}
+                                    disabled={p.player_id === loserId}
                                 >
                                     {getShortName(p.player)}
                                 </button>
@@ -316,7 +387,13 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
 
                     {/* Hand Pattern Selection */}
                     <div>
-                        <label className="block font-bold text-sm mb-2 uppercase">牌型</label>
+                        <label className="block font-bold text-sm mb-2 uppercase flex items-center gap-2">
+                            <span>牌型</span>
+                            <div className="flex-1"></div>
+                            <span className="bg-orange px-3 py-1 rounded-full text-lg font-body font-bold">
+                                {effectiveFan} 番
+                            </span>
+                        </label>
 
                         {/* Tabs for Regular / Limit */}
                         <div className="flex gap-1 mb-2">
@@ -343,9 +420,12 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                                     key={p.id}
                                     className={`py-2 px-1 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes(p.id)
                                         ? 'bg-cyan shadow-comic-sm'
-                                        : 'bg-white hover:bg-gray-100'
+                                        : isRegularDisabled(p.id)
+                                            ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                                            : 'bg-white hover:bg-gray-100'
                                         }`}
-                                    onClick={() => handlePatternToggle(p.id)}
+                                    onClick={() => !isRegularDisabled(p.id) && handlePatternToggle(p.id)}
+                                    disabled={isRegularDisabled(p.id)}
                                 >
                                     {p.name} <span className="text-gray-500">+{p.fan}</span>
                                 </button>
@@ -426,18 +506,24 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                                 <button
                                     className={`py-2 px-2 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes('ping_hu')
                                         ? 'bg-yellow shadow-comic-sm'
-                                        : 'bg-white hover:bg-gray-100'
+                                        : isRegularDisabled('ping_hu')
+                                            ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                                            : 'bg-white hover:bg-gray-100'
                                         }`}
-                                    onClick={() => handlePatternToggle('ping_hu')}
+                                    onClick={() => !isRegularDisabled('ping_hu') && handlePatternToggle('ping_hu')}
+                                    disabled={isRegularDisabled('ping_hu')}
                                 >
                                     平糊 <span className="text-gray-500">+1</span>
                                 </button>
                                 <button
                                     className={`py-2 px-2 rounded-md border-comic-thin text-xs font-bold transition-all ${selectedPatterns.includes('men_qian_qing')
                                         ? 'bg-yellow shadow-comic-sm'
-                                        : 'bg-white hover:bg-gray-100'
+                                        : isRegularDisabled('men_qian_qing')
+                                            ? 'bg-gray-100 opacity-50 cursor-not-allowed'
+                                            : 'bg-white hover:bg-gray-100'
                                         }`}
-                                    onClick={() => handlePatternToggle('men_qian_qing')}
+                                    onClick={() => !isRegularDisabled('men_qian_qing') && handlePatternToggle('men_qian_qing')}
+                                    disabled={isRegularDisabled('men_qian_qing')}
                                 >
                                     門清 <span className="text-gray-500">+1</span>
                                 </button>
@@ -473,31 +559,40 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                         </div>
                     </div>
 
-                    {/* Fan Selection */}
-                    <div>
-                        <label className="block font-bold text-sm mb-2 uppercase flex justify-between items-center">
-                            <span>番</span>
+                    {/* Fan Selection - Collapsible */}
+                    <div className="bg-gray-50 rounded-lg p-3">
+                        <button
+                            className="w-full text-left font-bold text-sm uppercase flex justify-between items-center"
+                            onClick={() => setShowManualFan(!showManualFan)}
+                        >
+                            <span className="flex items-center gap-1">
+                                手動輸入番數 {showManualFan ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </span>
                             <span className="text-orange font-title text-base">{getPointsDisplay()}</span>
-                        </label>
-                        <div className="grid grid-cols-7 gap-1">
-                            {FAN_OPTIONS.map(fan => (
-                                <button
-                                    key={fan}
-                                    className={`py-2 rounded border-comic-thin font-title text-lg transition-all ${effectiveFan === fan
-                                        ? 'bg-orange shadow-comic-sm'
-                                        : calculatedFan !== null && fan !== calculatedFan
-                                            ? 'bg-gray-100 opacity-40'
-                                            : 'bg-white hover:bg-gray-100'
-                                        }`}
-                                    onClick={() => { setFanCount(fan); setSelectedPatterns([]); setFanZiCount(0) }}
-                                >
-                                    {fan}
-                                </button>
-                            ))}
-                        </div>
-                        {calculatedFan !== null && (
-                            <div className="text-xs text-gray-500 mt-1 text-center">
-                                ⓘ Auto-calculated from patterns. Tap a number to override.
+                        </button>
+                        {showManualFan && (
+                            <div className="mt-3">
+                                <div className="grid grid-cols-7 gap-1">
+                                    {FAN_OPTIONS.map(fan => (
+                                        <button
+                                            key={fan}
+                                            className={`py-2 rounded border-comic-thin font-title text-lg transition-all ${effectiveFan === fan
+                                                ? 'bg-orange shadow-comic-sm'
+                                                : calculatedFan !== null && fan !== calculatedFan
+                                                    ? 'bg-gray-100 opacity-40'
+                                                    : 'bg-white hover:bg-gray-100'
+                                                }`}
+                                            onClick={() => { setFanCount(fan); setSelectedPatterns([]); setFanZiCount(0); setZhengHuaCount(0) }}
+                                        >
+                                            {fan}
+                                        </button>
+                                    ))}
+                                </div>
+                                {calculatedFan !== null && (
+                                    <div className="text-xs text-gray-500 mt-1 text-center">
+                                        ⓘ Auto-calculated from patterns. Tap a number to override.
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
