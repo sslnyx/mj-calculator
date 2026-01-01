@@ -203,8 +203,10 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
 
     // Get points display for current fan
     const getPointsDisplay = () => {
-        const points = getPointsForFan(effectiveFan)
-        return `${effectiveFan}番 = ${points}分`
+        const basePoints = getPointsForFan(effectiveFan)
+        const isZimo = winType === 'zimo' || winType === 'zimo_bao'
+        const displayPoints = isZimo ? (basePoints / 2) * 3 : basePoints
+        return `${effectiveFan}番 = ${displayPoints}分`
     }
 
     // Check if a limit hand should be disabled
