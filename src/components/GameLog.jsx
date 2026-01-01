@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { getPointsForFan } from '../lib/scoring'
 
 const WINDS = ['East', 'South', 'West', 'North']
 
@@ -42,7 +43,7 @@ const GameLog = ({ roomId, players, onUpdate }) => {
     const [loading, setLoading] = useState(true)
     const [deleting, setDeleting] = useState(null)
 
-    // Fetch game rounds
+    // Fetch game rounds with winner/loser player details
     useEffect(() => {
         if (!roomId) return
 
@@ -50,7 +51,11 @@ const GameLog = ({ roomId, players, onUpdate }) => {
             setLoading(true)
             const { data, error } = await supabase
                 .from('game_rounds')
-                .select('*')
+                .select(`
+                    *,
+                    winner:winner_id(id, display_name),
+                    loser:loser_id(id, display_name)
+                `)
                 .eq('room_id', roomId)
                 .order('created_at', { ascending: false })
 
@@ -80,8 +85,21 @@ const GameLog = ({ roomId, players, onUpdate }) => {
         }
     }, [roomId])
 
-    // Get player name by ID
-    const getPlayerName = (playerId) => {
+    // Get player name by ID - uses round's joined data first, then room players
+    const getPlayerName = (playerId, round = null) => {
+        // First check if round has the player data (winner or loser)
+        if (round) {
+            if (round.winner?.id === playerId) {
+                const name = round.winner.display_name || 'Unknown'
+                return name.split(' ')[0]
+            }
+            if (round.loser?.id === playerId) {
+                const name = round.loser.display_name || 'Unknown'
+                return name.split(' ')[0]
+            }
+        }
+
+        // Fallback to room players
         const player = players.find(p => p.player_id === playerId)
         const name = player?.player?.display_name || 'Unknown'
         return name.split(' ')[0]
@@ -93,6 +111,119 @@ const GameLog = ({ roomId, players, onUpdate }) => {
         const seat = player?.seat_position || 1
         return WINDS[(seat - 1) % 4]
     }
+
+    // Calculate accumulated points for each round
+    // Returns a map: roundId -> { playerId: accumulatedPoints }
+    const accumulatedPointsByRound = useMemo(() => {
+        if (!rounds.length || !players.length) return {}
+
+        // Sort rounds by created_at ascending (oldest first) for calculation
+        const sortedRounds = [...rounds].sort((a, b) =>
+            new Date(a.created_at) - new Date(b.created_at)
+        )
+
+        // Initialize all players with 0 points
+        const runningTotals = {}
+        players.forEach(p => {
+            runningTotals[p.player_id] = 0
+        })
+
+        const result = {}
+
+        sortedRounds.forEach(round => {
+            const basePoints = round.points
+            const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
+            const winnerId = round.winner_id
+            const loserId = round.loser_id
+
+            if (isZimo) {
+                // Zimo: winner gets (base/2) * 3, each other loses (base/2)
+                const halfPoints = basePoints / 2
+                const winnerGain = halfPoints * 3
+
+                if (runningTotals[winnerId] !== undefined) {
+                    runningTotals[winnerId] += winnerGain
+                }
+
+                if (round.win_type === 'zimo_bao' && loserId) {
+                    // Bao: only one player pays all
+                    if (runningTotals[loserId] !== undefined) {
+                        runningTotals[loserId] -= winnerGain
+                    }
+                } else {
+                    // Normal zimo: everyone else pays
+                    players.forEach(p => {
+                        if (p.player_id !== winnerId && runningTotals[p.player_id] !== undefined) {
+                            runningTotals[p.player_id] -= halfPoints
+                        }
+                    })
+                }
+            } else {
+                // Eat: winner gets base, loser loses base
+                if (runningTotals[winnerId] !== undefined) {
+                    runningTotals[winnerId] += basePoints
+                }
+                if (loserId && runningTotals[loserId] !== undefined) {
+                    runningTotals[loserId] -= basePoints
+                }
+            }
+
+            // Store snapshot of accumulated points after this round
+            result[round.id] = { ...runningTotals }
+        })
+
+        return result
+    }, [rounds, players])
+
+    // Calculate point changes for THIS round only (not accumulated)
+    // Returns a map: roundId -> { playerId: pointChange }
+    const roundPointChanges = useMemo(() => {
+        const result = {}
+
+        rounds.forEach(round => {
+            const basePoints = round.points
+            const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
+            const winnerId = round.winner_id
+            const loserId = round.loser_id
+
+            const changes = {}
+            players.forEach(p => {
+                changes[p.player_id] = 0
+            })
+
+            if (isZimo) {
+                const halfPoints = basePoints / 2
+                const winnerGain = halfPoints * 3
+
+                if (changes[winnerId] !== undefined) {
+                    changes[winnerId] = winnerGain
+                }
+
+                if (round.win_type === 'zimo_bao' && loserId) {
+                    if (changes[loserId] !== undefined) {
+                        changes[loserId] = -winnerGain
+                    }
+                } else {
+                    players.forEach(p => {
+                        if (p.player_id !== winnerId && changes[p.player_id] !== undefined) {
+                            changes[p.player_id] = -halfPoints
+                        }
+                    })
+                }
+            } else {
+                if (changes[winnerId] !== undefined) {
+                    changes[winnerId] = basePoints
+                }
+                if (loserId && changes[loserId] !== undefined) {
+                    changes[loserId] = -basePoints
+                }
+            }
+
+            result[round.id] = changes
+        })
+
+        return result
+    }, [rounds, players])
 
     // Delete a round and reverse the points
     const handleDeleteRound = async (round) => {
@@ -283,26 +414,21 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                     >
                         {/* Top Row: Wind, Winner, Type, Loser, Points, Delete */}
                         <div className="flex items-center gap-2">
-                            {/* Wind Badge */}
+                            {/* Game Number Badge */}
                             <div className="bg-cyan text-black text-xs font-bold py-1 px-2 rounded border-2 border-black shrink-0">
-                                {getSeatWind(round.winner_id)} {roundNum}
+                                Game {roundNum}
                             </div>
 
                             {/* Content */}
                             <div className="flex-1 flex items-center gap-2 min-w-0 text-sm font-bold">
-                                <span className="truncate">{getPlayerName(round.winner_id)}</span>
+                                <span className="truncate">{getPlayerName(round.winner_id, round)}</span>
                                 <span className={`py-0.5 px-1.5 rounded text-xs border border-black ${round.win_type === 'eat' ? 'bg-pink' : 'bg-yellow'
                                     }`}>
                                     {round.win_type === 'eat' ? 'HIT' : 'TSUMO'}
                                 </span>
                                 {round.loser_id && (
-                                    <span className="truncate text-gray-500">{getPlayerName(round.loser_id)}</span>
+                                    <span className="truncate text-gray-500">{getPlayerName(round.loser_id, round)}</span>
                                 )}
-                            </div>
-
-                            {/* Points */}
-                            <div className="font-title text-lg text-green shrink-0">
-                                +{winnerPoints}
                             </div>
 
                             {/* Delete Button */}
@@ -314,6 +440,42 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                                 {deleting === round.id ? '...' : '✕'}
                             </button>
                         </div>
+
+                        {/* Stacked Scores: Round Change + Accumulated */}
+                        {roundPointChanges[round.id] && (
+                            <div className="flex items-stretch gap-1.5 mt-2">
+                                {players
+                                    .sort((a, b) => a.seat_position - b.seat_position)
+                                    .map(p => {
+                                        const roundPts = roundPointChanges[round.id][p.player_id] || 0
+                                        const accPts = accumulatedPointsByRound[round.id]?.[p.player_id] || 0
+                                        return (
+                                            <div
+                                                key={p.player_id}
+                                                className={`flex-1 text-center py-1.5 rounded-md ${accPts > 0 ? 'bg-green/10' :
+                                                    accPts < 0 ? 'bg-red/10' :
+                                                        'bg-gray-50'
+                                                    }`}
+                                            >
+                                                {/* Round change */}
+                                                <div className={`font-title text-base ${roundPts > 0 ? 'text-green-bold' :
+                                                    roundPts < 0 ? 'text-red-bold' :
+                                                        'text-gray-300'
+                                                    }`}>
+                                                    {roundPts !== 0 ? (roundPts > 0 ? `+${roundPts}` : roundPts) : '·'}
+                                                </div>
+                                                {/* Player name + accumulated */}
+                                                <div className={`text-[10px] font-bold ${accPts > 0 ? 'text-green-bold' :
+                                                    accPts < 0 ? 'text-red-bold' :
+                                                        'text-gray-400'
+                                                    }`}>
+                                                    {getPlayerName(p.player_id)} {accPts > 0 ? `+${accPts}` : accPts}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                            </div>
+                        )}
 
                         {/* Bottom Row: Hand Patterns & Fan Count */}
                         <div className="flex items-center gap-2 mt-2 text-xs">

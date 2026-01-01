@@ -12,6 +12,7 @@ import {
 } from '../lib/rooms'
 import HuModal from '../components/HuModal'
 import GameLog from '../components/GameLog'
+import ScoreTable from '../components/ScoreTable'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination } from 'swiper/modules'
 import { getPlayerAvatar } from '../lib/avatar'
@@ -257,7 +258,21 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                     </section>
                 </SwiperSlide>
 
-                {/* Slide 2: Game Log */}
+                {/* Slide 2: Score Table */}
+                <SwiperSlide>
+                    <section className="h-full flex flex-col p-4 pb-8">
+                        {/* <h3 className="font-title text-xl mb-3 shrink-0">SCORE TABLE</h3> */}
+                        <div className="flex-1 min-h-0 bg-white border-comic-thin rounded-lg shadow-comic-sm overflow-hidden">
+                            <ScoreTable
+                                roomId={room.id}
+                                players={players}
+                                onUpdate={handleHuSuccess}
+                            />
+                        </div>
+                    </section>
+                </SwiperSlide>
+
+                {/* Slide 3: Game Log (History) */}
                 <SwiperSlide>
                     <section className="h-full flex flex-col p-4 pb-8">
                         <h3 className="font-title text-xl mb-3 shrink-0">GAME LOG</h3>

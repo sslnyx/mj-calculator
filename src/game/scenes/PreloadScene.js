@@ -44,19 +44,35 @@ export default class PreloadScene extends Phaser.Scene {
         // Load character sheet as regular image (we'll crop manually)
         this.load.image('character_sheet', '/game/sprites/characters.png')
 
-        // Load test character (c1/rb.png)
-        this.load.image('test_char', '/game/sprites/c1_rb.png')
-
-        // Load test sprite sheet (c1-stand.png) - 3 frames
-        this.load.spritesheet('test_sheet_idle', '/game/sprites/c1_stand.png', {
-            frameWidth: 217,
-            frameHeight: 470
+        // Load NEW character sprite sheets (separate for walk and idle)
+        // Walk: 1057x1080, 4 columns × 7 rows = 28 frames (264x154 per frame)
+        this.load.spritesheet('char_walk_se', '/game/sprites/c1-se-2-walk-4x7.png', {
+            frameWidth: 264,
+            frameHeight: 154
         })
 
-        // Load test sprite sheet (c1-walk.png) - 6 frames (2 columns x 3 rows)
-        this.load.spritesheet('test_sheet_walk', '/game/sprites/c1_walk.png', {
-            frameWidth: 344,
-            frameHeight: 517
+        // Idle (aligned, no bg): 1280x1140, 4 columns × 6 rows = 24 frames (320x190 per frame)
+        this.load.spritesheet('char_idle_se', '/game/sprites/c1-idel-aligned-no-bg.png', {
+            frameWidth: 320,
+            frameHeight: 190
+        })
+
+        // Keep old spritesheets for other directions (E direction)
+        this.load.spritesheet('char_e', '/game/sprites/c1-e.png', {
+            frameWidth: 172,
+            frameHeight: 259
+        })
+        this.load.spritesheet('char_se', '/game/sprites/c1-se.png', {
+            frameWidth: 172,
+            frameHeight: 259
+        })
+
+        // NEW: Pixel Art 8-direction idle sprite sheet
+        // 4 frames per direction, 8 directions (rows: S, SW, W, NW, N, NE, E, SE)
+        // Total: 256x512 (4 cols × 64px, 8 rows × 64px)
+        this.load.spritesheet('pixel_idle_8dir', '/game/sprites/pixel_art/idle_consistent_8dir.png', {
+            frameWidth: 64,
+            frameHeight: 64
         })
     }
     create() {

@@ -22,37 +22,62 @@ export default class VillageScene extends Phaser.Scene {
         const scale = Math.max(scaleX, scaleY)
         bg.setScale(scale)
 
-        // Create player character using idle sprite sheet initially
+        // Create player character using pixel art 8-direction idle sprite
         this.player = this.add.sprite(
             this.cameras.main.width / 2,
             this.cameras.main.height / 2,
-            'test_sheet_idle'
+            'pixel_idle_8dir',
+            0  // Start at frame 0 (south direction)
         )
-        this.player.setScale(0.3) // Scale down
+        this.player.setOrigin(0.5, 1) // Anchor at bottom-center (feet position)
+        this.player.setScale(3.0) // Scale up pixel art 3x for visibility (64px -> 192px)
 
-        // Define Idle Animation (3 frames)
-        if (!this.anims.exists('idle')) {
-            this.anims.create({
-                key: 'idle',
-                frames: this.anims.generateFrameNumbers('test_sheet_idle', { start: 0, end: 2 }),
-                frameRate: 4, // Slower for idle
-                repeat: -1,
-                yoyo: true // Ping-pong effect for smoother breathing
-            })
-        }
+        // ===== 8-DIRECTION PIXEL ART IDLE ANIMATIONS =====
+        // Spritesheet layout: 4 columns (frames) × 8 rows (directions)
+        // Row order: 0=south, 1=south-west, 2=west, 3=north-west, 4=north, 5=north-east, 6=east, 7=south-east
+        const directions = ['south', 'south-west', 'west', 'north-west', 'north', 'north-east', 'east', 'south-east']
+        const framesPerRow = 4
 
-        // Define Walk Animation (6 frames)
-        if (!this.anims.exists('walk')) {
+        directions.forEach((dir, rowIndex) => {
+            const animKey = `pixel_idle_${dir}`
+            if (!this.anims.exists(animKey)) {
+                // Calculate frame indices for this row
+                const startFrame = rowIndex * framesPerRow
+                const endFrame = startFrame + framesPerRow - 1
+
+                this.anims.create({
+                    key: animKey,
+                    frames: this.anims.generateFrameNumbers('pixel_idle_8dir', { start: startFrame, end: endFrame }),
+                    frameRate: 6,
+                    repeat: -1
+                })
+            }
+        })
+
+        // Keep legacy animations for walk/run (until we have pixel art versions)
+        // ===== WALK Animation (using char_walk_se, 28 frames) =====
+        if (!this.anims.exists('walk_se')) {
             this.anims.create({
-                key: 'walk',
-                frames: this.anims.generateFrameNumbers('test_sheet_walk', { start: 0, end: 5 }),
-                frameRate: 10,
+                key: 'walk_se',
+                frames: this.anims.generateFrameNumbers('char_walk_se', { start: 0, end: 27 }),
+                frameRate: 14,
                 repeat: -1
             })
         }
 
-        // Start idle
-        this.player.anims.play('idle')
+        // ===== RUN Animation (faster walk) =====
+        if (!this.anims.exists('run_se')) {
+            this.anims.create({
+                key: 'run_se',
+                frames: this.anims.generateFrameNumbers('char_walk_se', { start: 0, end: 27 }),
+                frameRate: 20,
+                repeat: -1
+            })
+        }
+
+        // Start with south-facing idle animation
+        this.player.anims.play('pixel_idle_south', true)
+        this.currentDirection = 'south'
 
         // Make player interactive
         this.player.setInteractive()
@@ -114,19 +139,23 @@ export default class VillageScene extends Phaser.Scene {
         let velocityX = 0
         let velocityY = 0
 
+        // Check if running (shift key held)
+        const isRunning = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT).isDown
+        const currentSpeed = isRunning ? this.playerSpeed * 1.8 : this.playerSpeed
+
         // Keyboard movement
         if (this.cursors.left.isDown || this.wasd.left.isDown) {
-            velocityX = -this.playerSpeed
+            velocityX = -currentSpeed
             this.player.setFlipX(true)
         } else if (this.cursors.right.isDown || this.wasd.right.isDown) {
-            velocityX = this.playerSpeed
+            velocityX = currentSpeed
             this.player.setFlipX(false)
         }
 
         if (this.cursors.up.isDown || this.wasd.up.isDown) {
-            velocityY = -this.playerSpeed
+            velocityY = -currentSpeed
         } else if (this.cursors.down.isDown || this.wasd.down.isDown) {
-            velocityY = this.playerSpeed
+            velocityY = currentSpeed
         }
 
         // Click to move
@@ -136,8 +165,8 @@ export default class VillageScene extends Phaser.Scene {
             const distance = Math.sqrt(dx * dx + dy * dy)
 
             if (distance > 10) {
-                velocityX = (dx / distance) * this.playerSpeed
-                velocityY = (dy / distance) * this.playerSpeed
+                velocityX = (dx / distance) * currentSpeed
+                velocityY = (dy / distance) * currentSpeed
 
                 if (dx < 0) this.player.setFlipX(true)
                 else if (dx > 0) this.player.setFlipX(false)
@@ -152,18 +181,62 @@ export default class VillageScene extends Phaser.Scene {
         this.player.x += velocityX * deltaTime
         this.player.y += velocityY * deltaTime
 
-        // Handle walking animation
+        // Handle animation based on movement state
         const isMoving = velocityX !== 0 || velocityY !== 0
 
         if (isMoving) {
-            // Play walk animation if shorter duration or if different
-            if (this.player.anims.currentAnim?.key !== 'walk') {
-                this.player.anims.play('walk', true)
+            // Calculate 8-way direction from velocity
+            const angle = Math.atan2(velocityY, velocityX) * (180 / Math.PI)
+
+            // Map angle to 8 directions (angle 0 = east, increases clockwise)
+            // east: -22.5 to 22.5, south-east: 22.5 to 67.5, etc.
+            let direction
+            let flipX = false
+
+            if (angle >= -22.5 && angle < 22.5) {
+                direction = 'east'
+            } else if (angle >= 22.5 && angle < 67.5) {
+                direction = 'south-east'
+            } else if (angle >= 67.5 && angle < 112.5) {
+                direction = 'south'
+            } else if (angle >= 112.5 && angle < 157.5) {
+                direction = 'south-west'
+                // Use south-east animation flipped
+                direction = 'south-east'
+                flipX = true
+            } else if (angle >= 157.5 || angle < -157.5) {
+                direction = 'west'
+                // Use east animation flipped
+                direction = 'east'
+                flipX = true
+            } else if (angle >= -157.5 && angle < -112.5) {
+                direction = 'north-west'
+                // Use north-east animation flipped
+                direction = 'north-east'
+                flipX = true
+            } else if (angle >= -112.5 && angle < -67.5) {
+                direction = 'north'
+            } else if (angle >= -67.5 && angle < -22.5) {
+                direction = 'north-east'
+            }
+
+            this.player.setFlipX(flipX)
+            this.currentDirection = direction
+
+            // For now, use idle animation while moving (until we have walk sprites)
+            // TODO: Replace with pixel_walk_ animations when available
+            const targetAnim = `pixel_idle_${direction}`
+
+            if (this.player.anims.currentAnim?.key !== targetAnim) {
+                this.player.anims.play(targetAnim, true)
             }
         } else {
-            // Play idle animation
-            if (this.player.anims.currentAnim?.key !== 'idle') {
-                this.player.anims.play('idle', true)
+            // Play idle animation for the last direction faced
+            const idleDir = this.currentDirection || 'south'
+            const targetAnim = `pixel_idle_${idleDir}`
+
+            if (this.player.anims.currentAnim?.key !== targetAnim) {
+                this.player.anims.play(targetAnim, true)
             }
         }
 

@@ -219,9 +219,37 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                         </div>
                     )}
 
-                    {/* Winner Selection */}
-                    <div>
-                        <label className="block font-bold text-sm mb-2 uppercase">邊個食糊?</label>
+                    {/* Winner Selection - Green Theme */}
+                    <div className="bg-green/10 border-2 border-green rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="font-bold text-sm uppercase">邊個食糊?</label>
+                            {/* Win Type Toggle - 自摸/包自摸 tabs */}
+                            <div className="flex gap-1 bg-green/20 p-1 rounded-lg">
+                                {[
+                                    { type: 'zimo', label: '自摸' },
+                                    { type: 'zimo_bao', label: '包自摸' }
+                                ].map(({ type, label }) => (
+                                    <button
+                                        key={type}
+                                        className={`py-1 px-2 rounded-md font-bold text-xs transition-all ${winType === type
+                                            ? 'bg-green shadow-comic-sm'
+                                            : 'bg-transparent hover:bg-white/50'
+                                            }`}
+                                        onClick={() => {
+                                            // Toggle off if already selected, otherwise select
+                                            if (winType === type) {
+                                                setWinType('eat')
+                                            } else {
+                                                setWinType(type)
+                                            }
+                                            setLoserId(null)
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             {players.map(p => (
                                 <button
@@ -238,31 +266,9 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                         </div>
                     </div>
 
-                    {/* Win Type Toggle - 3 tabs */}
-                    <div>
-                        <div className="grid grid-cols-3 gap-1 bg-gray-200 p-1 rounded-lg">
-                            {[
-                                { type: 'eat', label: '点炮' },
-                                { type: 'zimo', label: '自摸' },
-                                { type: 'zimo_bao', label: '包自摸' }
-                            ].map(({ type, label }) => (
-                                <button
-                                    key={type}
-                                    className={`py-2 rounded-md font-bold text-sm transition-all ${winType === type
-                                        ? 'bg-orange shadow-comic-sm'
-                                        : 'bg-transparent hover:bg-white/50'
-                                        }`}
-                                    onClick={() => { setWinType(type); setLoserId(null) }}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Loser Selection (for eat) */}
-                    {winType === 'eat' && (
-                        <div>
+                    {/* Loser Selection (for eat / deal-in) - Red Theme */}
+                    {winType !== 'zimo' && winType !== 'zimo_bao' && (
+                        <div className="bg-red/10 border-2 border-red rounded-xl p-3">
                             <label className="block font-bold text-sm mb-2 uppercase">邊個出銃?</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {players.map(p => (
@@ -284,9 +290,9 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                         </div>
                     )}
 
-                    {/* Bao player selection (for zimo_bao) */}
+                    {/* Bao player selection (for zimo_bao) - Red Theme */}
                     {winType === 'zimo_bao' && (
-                        <div>
+                        <div className="bg-red/10 border-2 border-red rounded-xl p-3">
                             <label className="block font-bold text-sm mb-2 uppercase">邊個包?</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {players.map(p => (
