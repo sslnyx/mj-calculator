@@ -1,5 +1,8 @@
 # 🀄 PONPONMANIA - Mahjong Calculator v2
 
+> [!NOTE]
+> The `v2` codebase has been promoted to the `main` branch. The original project is now archived in the `legacy` branch.
+
 A modern, multiplayer Mahjong score calculator built with React and Supabase. Track scores in real-time with friends during your Mahjong sessions!
 
 ![PONPONMANIA](https://img.shields.io/badge/PONPONMANIA-Mahjong%20Calculator-orange)
