@@ -8,14 +8,18 @@ import {
     endGame,
     leaveRoom,
     subscribeToRoom,
-    unsubscribeFromRoom
+    unsubscribeFromRoom,
+    joinRoom
 } from '../lib/rooms'
 import HuModal from '../components/HuModal'
 import GameLog from '../components/GameLog'
 import ScoreTable from '../components/ScoreTable'
+import GuestSelectModal from '../components/GuestSelectModal'
+import ConfirmModal from '../components/ConfirmModal'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination } from 'swiper/modules'
 import { getPlayerAvatar } from '../lib/avatar'
+import { UserPlus } from 'lucide-react'
 import 'swiper/css'
 import 'swiper/css/pagination'
 
@@ -32,6 +36,9 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [showHuModal, setShowHuModal] = useState(false)
+    const [showGuestModal, setShowGuestModal] = useState(false)
+    const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+    const [selectedSeat, setSelectedSeat] = useState(null)
     const swiperRef = useRef(null)
 
     const isAdmin = player?.is_admin === true
@@ -97,6 +104,21 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
     }
 
     const handleLeaveRoom = async () => {
+        // Count real players (non-guests)
+        const realPlayers = room.room_players.filter(rp => !rp.is_spectator && !rp.player?.is_guest)
+        const isLastRealPlayer = realPlayers.length === 1 && realPlayers[0].player_id === player.id
+
+        // Show warning if last real player and game is active
+        if (isLastRealPlayer && room.status === 'active') {
+            setShowLeaveConfirm(true)
+            return
+        }
+
+        await confirmLeaveRoom()
+    }
+
+    const confirmLeaveRoom = async () => {
+        setShowLeaveConfirm(false)
         try {
             await leaveRoom(room.id, player.id)
             onLeave()
@@ -137,6 +159,32 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
         // Refresh room
         const updatedRoom = await getRoomByCode(roomCode)
         setRoom(updatedRoom)
+    }
+
+    // Add guest player to a seat
+    const handleAddGuest = (seat) => {
+        setSelectedSeat(seat)
+        setShowGuestModal(true)
+    }
+
+    const handleGuestSelected = async (guest) => {
+        try {
+            // Join the guest to the room at the selected seat
+            await supabase
+                .from('room_players')
+                .insert({
+                    room_id: room.id,
+                    player_id: guest.id,
+                    seat_position: selectedSeat,
+                    current_points: 0
+                })
+
+            // Refresh room
+            const updatedRoom = await getRoomByCode(roomCode)
+            setRoom(updatedRoom)
+        } catch (err) {
+            setError(err.message)
+        }
     }
 
     if (loading) {
@@ -246,10 +294,20 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                                                 {playerInSeat.current_points >= 0 ? '+' : ''}{playerInSeat.current_points}
                                             </div>
                                         </>
+                                    ) : room.status === 'waiting' ? (
+                                        <button
+                                            onClick={() => handleAddGuest(seat)}
+                                            className="flex flex-col items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+                                        >
+                                            <div className="w-14 h-14 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center hover:border-gray-500 hover:bg-gray-100 transition-all">
+                                                <UserPlus size={24} className="text-gray-400" />
+                                            </div>
+                                            <div className="font-bold text-sm">加玩家</div>
+                                        </button>
                                     ) : (
                                         <div className="text-gray-500">
                                             <div className="font-bold text-sm">Seat {seat}</div>
-                                            <div className="text-xs">Waiting...</div>
+                                            <div className="text-xs">Empty</div>
                                         </div>
                                     )}
                                 </div>
@@ -354,6 +412,24 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                 players={players}
                 onSuccess={handleHuSuccess}
                 onNavigate={onNavigate}
+            />
+
+            {/* Guest Select Modal */}
+            <GuestSelectModal
+                isOpen={showGuestModal}
+                onClose={() => setShowGuestModal(false)}
+                ownerId={player?.id}
+                onSelect={handleGuestSelected}
+                roomId={room.id}
+            />
+
+            {/* Leave Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showLeaveConfirm}
+                title="確定離開?"
+                message="你係最後一個玩家。離開後牌局會自動結束，所有分數會被記錄。"
+                onConfirm={confirmLeaveRoom}
+                onCancel={() => setShowLeaveConfirm(false)}
             />
         </div>
     )

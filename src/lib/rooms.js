@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { addGuestOwnership } from './guests'
 
 // 超級無敵搭錯線 room name generator (TVB 獎門人 style)
 // Mix A phrases with B phrases for funny combinations
@@ -325,8 +326,43 @@ export const joinRoom = async (roomCode, playerId) => {
 
     if (error) throw error
 
+    // Auto-adopt any guests in the room
+    await adoptGuestsInRoom(room.id, playerId)
+
     // Return updated room
     return await getRoomByCode(roomCode)
+}
+
+// Helper: Adopt all guests in a room (add ownership)
+const adoptGuestsInRoom = async (roomId, newOwnerId) => {
+    try {
+        // Get all players in the room who are guests
+        const { data: roomPlayers } = await supabase
+            .from('room_players')
+            .select(`
+                player:players (
+                    id,
+                    is_guest
+                )
+            `)
+            .eq('room_id', roomId)
+
+        if (!roomPlayers) return
+
+        // For each guest, add ownership
+        for (const rp of roomPlayers) {
+            if (rp.player?.is_guest) {
+                try {
+                    await addGuestOwnership(rp.player.id, newOwnerId)
+                } catch (err) {
+                    // Ignore errors (might already own this guest)
+                    console.log('Auto-adopt skipped:', err.message)
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error adopting guests:', err)
+    }
 }
 
 // Join as spectator (watch only mode)

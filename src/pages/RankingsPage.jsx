@@ -55,7 +55,10 @@ const RankingsPage = ({ onBack }) => {
         ]
 
         // Filter out test players
-        const realPlayers = data.filter(s => !TEST_PLAYER_IDS.includes(s.player_id))
+        const realPlayers = data.filter(s =>
+            !TEST_PLAYER_IDS.includes(s.player_id) &&
+            (s.total_games || 0) > 0  // Hide players who never played
+        )
 
         // Calculate derived values and sort
         const sorted = realPlayers
@@ -85,7 +88,35 @@ const RankingsPage = ({ onBack }) => {
                 }
             })
 
-        setPlayers(sorted)
+        // Assign ranks (same value = same rank)
+        const withRanks = []
+        for (let i = 0; i < sorted.length; i++) {
+            const player = sorted[i]
+            let rank = 1
+            if (i > 0) {
+                const prevPlayer = withRanks[i - 1] // Use already-ranked player
+                const isTie = (() => {
+                    switch (activeTab) {
+                        case 'points':
+                            return player.netPoints === prevPlayer.netPoints
+                        case 'winrate':
+                            return parseFloat(player.winRate) === parseFloat(prevPlayer.winRate)
+                        case 'avgfan':
+                            return parseFloat(player.avgFan) === parseFloat(prevPlayer.avgFan)
+                        case 'lucky':
+                            return player.limitCount === prevPlayer.limitCount
+                        default:
+                            return false
+                    }
+                })()
+                rank = isTie ? prevPlayer.rank : i + 1
+            }
+            withRanks.push({ ...player, rank })
+        }
+
+
+
+        setPlayers(withRanks)
         setLoading(false)
     }
 
@@ -104,11 +135,18 @@ const RankingsPage = ({ onBack }) => {
         }
     }
 
-    const getRankBgClass = (index) => {
-        if (index === 0) return 'bg-yellow'
-        if (index === 1) return 'bg-gray-200'
-        if (index === 2) return 'bg-orange/50'
+    const getRankBgClass = (rank) => {
+        if (rank === 1) return 'bg-yellow'
+        if (rank === 2) return 'bg-gray-200'
+        if (rank === 3) return 'bg-orange/50'
         return 'bg-white'
+    }
+
+    const getRankIcon = (rank) => {
+        if (rank === 1) return '🥇'
+        if (rank === 2) return '🥈'
+        if (rank === 3) return '🥉'
+        return null
     }
 
     return (
@@ -156,15 +194,15 @@ const RankingsPage = ({ onBack }) => {
                         {players.map((player, index) => (
                             <div
                                 key={player.player_id}
-                                className={`flex items-center gap-3 p-3 rounded-lg border-comic-thin shadow-comic-sm cursor-pointer hover:scale-[1.02] transition-transform ${getRankBgClass(index)}`}
+                                className={`flex items-center gap-3 p-3 rounded-lg border-comic-thin shadow-comic-sm cursor-pointer hover:scale-[1.02] transition-transform ${getRankBgClass(player.rank)}`}
                                 onClick={() => setSelectedPlayerId(player.player_id)}
                             >
                                 {/* Rank Number */}
                                 <div className="w-8 h-8 flex items-center justify-center font-title text-lg shrink-0">
-                                    {index < 3 ? (
-                                        <span className="text-2xl">{['🥇', '🥈', '🥉'][index]}</span>
+                                    {getRankIcon(player.rank) ? (
+                                        <span className="text-2xl">{getRankIcon(player.rank)}</span>
                                     ) : (
-                                        <span>{index + 1}</span>
+                                        <span>{player.rank}</span>
                                     )}
                                 </div>
 
@@ -180,7 +218,7 @@ const RankingsPage = ({ onBack }) => {
                                     </div>
                                     <div className="flex flex-col min-w-0">
                                         <span className="font-bold truncate">{getFirstName(player.player?.display_name) || 'Unknown'}</span>
-                                        {index === 0 && (
+                                        {player.rank === 1 && (
                                             <span className="inline-flex items-center gap-1 text-xs font-bold bg-gradient-to-r from-orange to-pink px-2 py-0.5 rounded-full border border-black w-fit animate-pulse">
                                                 <span>{RANK_TITLES[activeTab].emoji}</span>
                                                 <span>{RANK_TITLES[activeTab].title}</span>
