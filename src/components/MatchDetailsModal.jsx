@@ -193,7 +193,7 @@ const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
             onClick={onClose}
         >
             <div
-                className="bg-orange w-full max-w-[400px] h-[calc(100svh-200px)] max-h-[600px] rounded-xl border-comic-thick flex flex-col shadow-comic-lg relative overflow-hidden"
+                className="bg-orange w-full max-w-[400px] h-[calc(100svh-56px)] max-h-[600px] rounded-xl border-comic-thick flex flex-col shadow-comic-lg relative overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Close Button */}
