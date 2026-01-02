@@ -46,25 +46,35 @@ const Dashboard = () => {
         }
     }, [player, currentTable])
 
-    // Fetch and subscribe to active tables
-    useEffect(() => {
-        const fetchTables = async () => {
-            const { data } = await supabase
-                .from('game_rooms')
-                .select(`
+    const fetchTables = useCallback(async () => {
+        const { data } = await supabase
+            .from('game_rooms')
+            .select(`
           *,
           room_players (
             *,
             player:players (id, display_name, avatar_url, avatar_seed)
           )
         `)
-                .in('status', ['waiting', 'active'])
-                .order('created_at', { ascending: false })
-                .limit(10)
+            .in('status', ['waiting', 'active'])
+            .order('created_at', { ascending: false })
+            .limit(10)
 
-            if (data) setActiveTables(data)
-        }
+        if (data) setActiveTables(data)
+    }, [])
 
+    const refreshTimerRef = useRef(null)
+    const debouncedRefresh = useCallback(() => {
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = setTimeout(() => {
+            console.log('[Dashboard] Executing debounced table refresh...')
+            fetchTables()
+        }, 500)
+    }, [fetchTables])
+
+    // Fetch and subscribe to active tables
+    useEffect(() => {
+        console.log('[Dashboard] Initializing table subscription...')
         fetchTables()
 
         // Subscribe to table changes
@@ -73,17 +83,39 @@ const Dashboard = () => {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'game_rooms' },
-                () => fetchTables()
+                () => {
+                    console.log('[Dashboard] Room event received')
+                    debouncedRefresh()
+                }
             )
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'room_players' },
-                () => fetchTables()
+                () => {
+                    console.log('[Dashboard] Player event received')
+                    debouncedRefresh()
+                }
             )
-            .subscribe()
+            .subscribe((status) => {
+                console.log(`[Dashboard] Realtime status: ${status}`)
+            })
 
-        return () => supabase.removeChannel(channel)
-    }, [])
+        // Refresh when page becomes visible (handles mobile lock screen wake)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('[Dashboard] Page visible, refreshing lobby...')
+                fetchTables()
+            }
+        }
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+
+        return () => {
+            console.log('[Dashboard] Cleaning up table subscription...')
+            supabase.removeChannel(channel)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+            if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+        }
+    }, [fetchTables, debouncedRefresh])
 
     const handleCreateTable = useCallback(async () => {
         setError(null)
