@@ -2,46 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { getFirstName } from '../lib/names'
 import { getPlayerAvatar } from '../lib/avatar'
-import { calculateRoundChanges } from '../lib/scoring'
+import { calculateRoundChanges, calculateScoreTotals, getWinnerPoints } from '../lib/scoring'
+import { getPatternName } from '../lib/patterns'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/pagination'
-
-// Pattern ID to display name mapping
-const PATTERN_NAMES = {
-    // Regular
-    qing_yi_se: '清一色',
-    da_san_yuan: '大三元',
-    xiao_san_yuan: '小三元',
-    hua_yao_jiu: '花么九',
-    hun_yi_se: '混一色',
-    dui_dui_hu: '對對糊',
-    hua_hu: '花糊',
-    yi_tai_hua: '一臺花',
-    ping_hu: '平糊',
-    men_qian_qing: '門前清',
-    zheng_hua: '正花',
-    // Limit
-    tian_hu: '天胡',
-    di_hu: '地胡',
-    shi_san_yao: '十三幺',
-    jiu_lian_bao_deng: '九蓮寶燈',
-    da_si_xi: '大四喜',
-    xiao_si_xi: '小四喜',
-    zi_yi_se: '字一色',
-    qing_yao_jiu: '清么九',
-    kan_kan_hu: '坎坎胡',
-    shi_ba_luo_han: '十八羅漢',
-    ba_xian_guo_hai: '八仙過海',
-    // Bonus
-    wu_hua: '無花',
-    fan_zi: '番子',
-    qiang_gang: '搶槓',
-    gang_shang_hua: '槓上開花',
-    yao_jiu: '幺九',
-    hai_di_lao_yue: '海底撈月'
-}
 
 const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
     const [playerAvatars, setPlayerAvatars] = useState({}) // player_id -> avatar data
@@ -144,14 +110,9 @@ const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
         }
 
         // 3. Recalculate totals from rounds
-        const totals = { 1: 0, 2: 0, 3: 0, 4: 0 }
+        let totals = { 1: 0, 2: 0, 3: 0, 4: 0 }
         if (fullRounds.length > 0) {
-            fullRounds.forEach(round => {
-                const changes = calculateRoundChanges(round, seatMap)
-                Object.keys(changes).forEach(s => {
-                    totals[s] += changes[s] || 0
-                })
-            })
+            totals = calculateScoreTotals(fullRounds, seatMap)
         } else {
             // Use stored scores as temporary values
             Object.keys(playerRecords).forEach(seatNum => {
@@ -222,14 +183,7 @@ const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
 
     // Calculate points display for a round
     const calculatePoints = (round) => {
-        const basePoints = round.points
-        const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
-        return isZimo ? (basePoints / 2) * 3 : basePoints
-    }
-
-    // Get pattern display name
-    const getPatternName = (patternId) => {
-        return PATTERN_NAMES[patternId] || patternId
+        return getWinnerPoints(round.points, round.win_type)
     }
 
     // Get player name by seat

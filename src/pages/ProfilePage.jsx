@@ -5,6 +5,8 @@ import AvatarPicker from '../components/AvatarPicker'
 import { ArrowLeft, Pencil, Check, X, Camera } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getPlayerAvatar } from '../lib/avatar'
+import { calculateHexagonData, getNetPoints, hasEnoughGames } from '../lib/stats'
+import { getPatternName } from '../lib/patterns'
 
 const ProfilePage = ({ playerId, onBack }) => {
     const { player: currentPlayer, updatePlayer } = useAuth()
@@ -160,61 +162,6 @@ const ProfilePage = ({ playerId, onBack }) => {
     // Check if this is the current user's profile
     const isOwnProfile = currentPlayer?.id === playerId
 
-    // Calculate Hexagon values (0-100 scale)
-    const calculateHexagonData = () => {
-        if (!stats) return [0, 0, 0, 0, 0, 0]
-
-        const rounds = stats.total_games || 1
-        const wins = stats.total_wins || 1
-
-        // Total games threshold for "validated" stats
-        const hasEnoughGames = (stats.total_games || 0) > 10
-
-        // Speed: Win Rate (35% = 100%)
-        const winRateVal = ((stats.total_wins || 0) / rounds) * 100
-        const speed = hasEnoughGames ? Math.min(100, (winRateVal / 35) * 100) : 0
-
-        // Attack: Avg Fan (8 fan = 100%)
-        const avgFanVal = (stats.total_fan_value || 0) / wins
-        const attack = hasEnoughGames ? Math.min(100, (avgFanVal / 8) * 100) : 0
-
-        // Defense: Deal-in Avoidance (0% = 100%, 20% = 0%)
-        const dealInRate = ((stats.total_deal_ins || 0) / rounds) * 100
-        const defense = Math.max(0, 100 - (dealInRate / 40) * 100)
-
-        // Luck: Zimo Rate (70% = 100%)
-        const zimoRate = ((stats.total_zimo || 0) / wins) * 100
-        const luck = Math.min(100, (zimoRate / 70) * 100)
-
-        // Magic: Pattern diversity & special hands
-        // Base: Limit hands contribute 50%, patterns contribute other 50%
-        const limitRate = ((stats.total_limit_hands || 0) / wins) * 100
-        const limitScore = Math.min(50, (limitRate / 15) * 50)
-
-        // Pattern score: weight different patterns
-        const patternWeights = {
-            shi_san_yao: 5, jiu_lian_bao_deng: 5, da_si_xi: 5, da_san_yuan: 5, zi_yi_se: 4, kan_kan_hu: 4, // Limit hands
-            qing_yi_se: 3, xiao_san_yuan: 3, // High value
-            hun_yi_se: 2, dui_dui_hu: 2, hua_hu: 2, // Medium value
-            ping_hu: 1, wu_hua: 1, fan_zi: 1, qiang_gang: 2, gang_shang_hua: 2, hai_di_lao_yue: 2 // Others
-        }
-        let patternScore = 0
-        if (stats.hand_pattern_counts) {
-            Object.entries(stats.hand_pattern_counts).forEach(([pattern, count]) => {
-                patternScore += (patternWeights[pattern] || 1) * count
-            })
-        }
-        // Cap pattern score contribution at 50, scale so 25 points = 50%
-        const patternContribution = Math.min(50, (patternScore / 25) * 50)
-        const magic = Math.min(100, limitScore + patternContribution)
-
-        // Sanity: Bao Avoidance (0% = 100%, 10% = 0%)
-        const baoRate = ((stats.total_bao || 0) / rounds) * 100
-        const sanity = Math.max(0, 100 - (baoRate / 10) * 100)
-
-        return [speed, attack, defense, luck, magic, sanity]
-    }
-
     if (loading) {
         return (
             <div className="h-[100svh] flex flex-col items-center justify-center bg-gray-100 pb-16">
@@ -238,8 +185,8 @@ const ProfilePage = ({ playerId, onBack }) => {
         )
     }
 
-    const hexData = calculateHexagonData()
-    const netPoints = (stats?.total_points_won || 0) - (stats?.total_points_lost || 0)
+    const hexData = calculateHexagonData(stats)
+    const netPoints = getNetPoints(stats)
 
     return (
         <div className="h-[100svh] bg-gray-100 flex flex-col overflow-hidden pb-16">
@@ -390,7 +337,7 @@ const ProfilePage = ({ playerId, onBack }) => {
                         {(() => {
                             const games = stats?.total_games || 0
                             const wins = stats?.total_wins || 0
-                            const winRate = games > 10 ? ((wins / games) * 100).toFixed(1) : '-'
+                            const winRate = hasEnoughGames(stats) ? ((wins / games) * 100).toFixed(1) : '-'
                             return [
                                 { value: games, label: '總局數' },
                                 { value: wins, label: '勝利' },
@@ -434,24 +381,16 @@ const ProfilePage = ({ playerId, onBack }) => {
                                         return limitPatterns.includes(patternId)
                                     })
                                     .sort((a, b) => b[1] - a[1])
-                                    .map(([patternId, count]) => {
-                                        const patternNames = {
-                                            tian_hu: '天胡', di_hu: '地胡', shi_san_yao: '十三幺',
-                                            jiu_lian_bao_deng: '九蓮寶燈', da_si_xi: '大四喜',
-                                            xiao_si_xi: '小四喜', zi_yi_se: '字一色', qing_yao_jiu: '清么九',
-                                            kan_kan_hu: '坎坎胡', shi_ba_luo_han: '十八羅漢',
-                                            ba_xian_guo_hai: '八仙過海', da_san_yuan: '大三元'
-                                        }
-                                        return (
-                                            <div
-                                                key={patternId}
-                                                className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border-2 border-red/30"
-                                            >
-                                                <span className="font-bold text-sm text-red">{patternNames[patternId] || patternId}</span>
-                                                <span className="bg-red text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{count}</span>
-                                            </div>
-                                        )
-                                    })}
+                                    .map(([patternId, count]) => (
+                                        <div
+                                            key={patternId}
+                                            className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border-2 border-red/30"
+                                        >
+                                            <span className="font-bold text-sm text-red">{getPatternName(patternId)}</span>
+                                            <span className="bg-red text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{count}</span>
+                                        </div>
+                                    ))
+                                }
                             </div>
                         </div>
                     </section>
@@ -467,50 +406,16 @@ const ProfilePage = ({ playerId, onBack }) => {
                             <div className="flex flex-wrap gap-2">
                                 {Object.entries(stats.hand_pattern_counts)
                                     .sort((a, b) => b[1] - a[1]) // Sort by count descending
-                                    .map(([patternId, count]) => {
-                                        const patternNames = {
-                                            // Regular
-                                            qing_yi_se: '清一色',
-                                            da_san_yuan: '大三元',
-                                            xiao_san_yuan: '小三元',
-                                            hua_yao_jiu: '花么九',
-                                            hun_yi_se: '混一色',
-                                            dui_dui_hu: '對對糊',
-                                            hua_hu: '花糊',
-                                            yi_tai_hua: '一臺花',
-                                            ping_hu: '平糊',
-                                            men_qian_qing: '門前清',
-                                            zheng_hua: '正花',
-                                            // Limit
-                                            tian_hu: '天胡',
-                                            di_hu: '地胡',
-                                            shi_san_yao: '十三幺',
-                                            jiu_lian_bao_deng: '九蓮寶燈',
-                                            da_si_xi: '大四喜',
-                                            xiao_si_xi: '小四喜',
-                                            zi_yi_se: '字一色',
-                                            qing_yao_jiu: '清么九',
-                                            kan_kan_hu: '坎坎胡',
-                                            shi_ba_luo_han: '十八羅漢',
-                                            ba_xian_guo_hai: '八仙過海',
-                                            // Bonus
-                                            wu_hua: '無花',
-                                            fan_zi: '番子',
-                                            qiang_gang: '搶槓',
-                                            yao_jiu: '幺九',
-                                            gang_shang_hua: '槓上開花',
-                                            hai_di_lao_yue: '海底撈月'
-                                        }
-                                        return (
-                                            <div
-                                                key={patternId}
-                                                className="flex items-center gap-1.5 bg-gray-100 px-3 py-1.5 rounded-full border border-gray-300"
-                                            >
-                                                <span className="font-bold text-sm">{patternNames[patternId] || patternId}</span>
-                                                <span className="bg-orange text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{count}</span>
-                                            </div>
-                                        )
-                                    })}
+                                    .map(([patternId, count]) => (
+                                        <div
+                                            key={patternId}
+                                            className="flex items-center gap-1.5 bg-gray-100 px-3 py-1.5 rounded-full border border-gray-300"
+                                        >
+                                            <span className="font-bold text-sm">{getPatternName(patternId)}</span>
+                                            <span className="bg-orange text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{count}</span>
+                                        </div>
+                                    ))
+                                }
                             </div>
                         </div>
                     </section>

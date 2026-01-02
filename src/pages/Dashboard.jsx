@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { createRoom, joinRoom as joinTableService, joinAsSpectator, endGame } from '../lib/rooms'
+import { createRoom, joinRoom as joinTableService, joinAsSpectator, endGame, deleteRoom } from '../lib/rooms'
+import { Trash2, Package } from 'lucide-react'
 import GameRoom from './GameRoom'
 import ProfilePage from './ProfilePage'
 import RankingsPage from './RankingsPage'
@@ -186,29 +187,7 @@ const Dashboard = () => {
         setDeleteConfirm(null)
 
         try {
-            // Delete all game rounds for this room
-            await supabase
-                .from('game_rounds')
-                .delete()
-                .eq('room_id', tableId)
-
-            // Delete all vacated seats for this room
-            await supabase
-                .from('vacated_seats')
-                .delete()
-                .eq('room_id', tableId)
-
-            // Delete all room players
-            await supabase
-                .from('room_players')
-                .delete()
-                .eq('room_id', tableId)
-
-            // Delete the game room itself
-            await supabase
-                .from('game_rooms')
-                .delete()
-                .eq('id', tableId)
+            await deleteRoom(tableId)
         } catch (err) {
             setError(err.message)
         } finally {
@@ -418,7 +397,7 @@ const Dashboard = () => {
                                                     onClick={() => handleArchiveClick(table.id)}
                                                     title="結束牌局"
                                                 >
-                                                    📦
+                                                    <Package size={20} />
                                                 </button>
                                             )}
                                             {isAdmin && (
@@ -427,7 +406,7 @@ const Dashboard = () => {
                                                     onClick={() => handleDeleteClick(table.id)}
                                                     title="刪除牌局"
                                                 >
-                                                    🗑️
+                                                    <Trash2 size={20} />
                                                 </button>
                                             )}
                                         </div>

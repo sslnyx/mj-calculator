@@ -24,6 +24,17 @@ export const getPointsForFan = (fan) => {
 }
 
 /**
+ * Calculate winner points based on win type - SINGLE SOURCE OF TRUTH
+ * @param {number} basePoints - Base points from fan count
+ * @param {string} winType - 'eat', 'zimo', or 'zimo_bao'
+ * @returns {number} - Actual points the winner receives
+ */
+export const getWinnerPoints = (basePoints, winType) => {
+    const isZimo = winType === 'zimo' || winType === 'zimo_bao'
+    return isZimo ? (basePoints / 2) * 3 : basePoints
+}
+
+/**
  * Calculate point changes for a single round - THE SINGLE SOURCE OF TRUTH
  * @param {Object} round - game_rounds record
  * @param {Object} seatMap - { player_id: seat_position }
@@ -255,13 +266,25 @@ export const recordDirectWin = async ({
     await updatePoints(winnerId, points)
     await updatePoints(loserId, -points)
 
-    // Log for room_players to help UI debugging
-    const winner = roomPlayers.find(p => p.player_id === winnerId)
-    const loser = roomPlayers.find(p => p.player_id === loserId)
+    // Fetch vacated seats to include in stats update
+    const { data: vacatedSeats } = await supabase
+        .from('vacated_seats')
+        .select('player_id, seat_position, current_points')
+        .eq('room_id', roomId)
 
-    // Update lifetime stats for ALL players
+    // Merge active + vacated players for complete stats update
+    const allPlayers = [
+        ...roomPlayers,
+        ...(vacatedSeats || []).map(vs => ({
+            player_id: vs.player_id,
+            seat_position: vs.seat_position,
+            current_points: vs.current_points
+        }))
+    ]
+
+    // Update lifetime stats for ALL players (including vacated)
     await updateRoomStats({
-        roomPlayers,
+        roomPlayers: allPlayers,
         winnerId,
         loserId,
         winType: 'eat',
@@ -381,9 +404,19 @@ export const recordZimo = async ({
         }
     }
 
-    // Update lifetime stats for ALL players
+    // Merge active + vacated players for complete stats update
+    const allPlayers = [
+        ...roomPlayers,
+        ...(currentVacated || []).map(vs => ({
+            player_id: vs.player_id,
+            seat_position: vs.seat_position,
+            current_points: 0 // Not needed for stats, just structure
+        }))
+    ]
+
+    // Update lifetime stats for ALL players (including vacated)
     await updateRoomStats({
-        roomPlayers,
+        roomPlayers: allPlayers,
         winnerId,
         loserId: baoPlayerId || null,
         winType: baoPlayerId ? 'zimo_bao' : 'zimo',

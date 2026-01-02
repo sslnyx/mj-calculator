@@ -18,15 +18,9 @@ import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination } from 'swiper/modules'
 import { getPlayerAvatar } from '../lib/avatar'
 import { UserPlus } from 'lucide-react'
+import { TEST_PLAYERS } from '../lib/constants'
 import 'swiper/css'
 import 'swiper/css/pagination'
-
-// Test player IDs from migration
-const TEST_PLAYERS = [
-    { id: '11111111-1111-1111-1111-111111111111', name: 'Player A' },
-    { id: '22222222-2222-2222-2222-222222222222', name: 'Player B' },
-    { id: '33333333-3333-3333-3333-333333333333', name: 'Player C' }
-]
 
 // Inner component that uses the context
 const GameRoomContent = ({ roomCode, onLeave, onNavigate }) => {

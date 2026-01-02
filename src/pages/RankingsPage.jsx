@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { ArrowLeft, Trophy, TrendingUp, Zap, Star } from 'lucide-react'
 import { getPlayerAvatar } from '../lib/avatar'
 import { getFirstName } from '../lib/names'
+import { TEST_PLAYER_IDS } from '../lib/constants'
 import PlayerStatsModal from '../components/PlayerStatsModal'
 
 const RANKING_TABS = [
@@ -46,14 +47,6 @@ const RankingsPage = ({ onBack }) => {
             setLoading(false)
             return
         }
-
-        // Test player IDs to exclude from rankings
-        const TEST_PLAYER_IDS = [
-            '11111111-1111-1111-1111-111111111111',
-            '22222222-2222-2222-2222-222222222222',
-            '33333333-3333-3333-3333-333333333333',
-            '14fa428d-5e21-4ffc-8dd2-dfbcb28994b4' // ning@iSquare
-        ]
 
         // Filter out test players, admin, and those with low game counts for winrate
         const realPlayers = data.filter(s => {

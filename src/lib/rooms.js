@@ -545,6 +545,183 @@ export const endGame = async (roomId) => {
     return data
 }
 
+// Delete a room and all its associated data (Admin only)
+// This also reverses player_stats for all rounds in the room
+export const deleteRoom = async (roomId) => {
+    // 1. Fetch all rounds for this room (needed to reverse stats)
+    const { data: rounds, error: fetchError } = await supabase
+        .from('game_rounds')
+        .select('*')
+        .eq('room_id', roomId)
+
+    if (fetchError) throw fetchError
+
+    // 2. Get all unique player IDs involved in this room's rounds
+    const playerIds = new Set()
+    rounds?.forEach(round => {
+        if (round.winner_id) playerIds.add(round.winner_id)
+        if (round.loser_id) playerIds.add(round.loser_id)
+    })
+
+    // Also get players from room_players and vacated_seats
+    const { data: roomPlayers } = await supabase
+        .from('room_players')
+        .select('player_id')
+        .eq('room_id', roomId)
+
+    const { data: vacatedSeats } = await supabase
+        .from('vacated_seats')
+        .select('player_id')
+        .eq('room_id', roomId)
+
+    roomPlayers?.forEach(rp => { if (rp.player_id) playerIds.add(rp.player_id) })
+    vacatedSeats?.forEach(vs => { if (vs.player_id) playerIds.add(vs.player_id) })
+
+    // 3. For each player, reverse their stats based on rounds
+    for (const playerId of playerIds) {
+        // Fetch current stats
+        const { data: stats } = await supabase
+            .from('player_stats')
+            .select('*')
+            .eq('player_id', playerId)
+            .single()
+
+        if (!stats) continue
+
+        // Calculate what to subtract
+        let gamesPlayed = 0
+        let wins = 0
+        let zimoWins = 0
+        let eatWins = 0
+        let pointsWon = 0
+        let pointsLost = 0
+        let fanValue = 0
+        let limitHands = 0
+        let dealIns = 0
+        let baoCount = 0
+        const patternDecrements = {}
+
+        rounds?.forEach(round => {
+            const isWinner = round.winner_id === playerId
+            const isLoser = round.loser_id === playerId
+            const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
+            const basePoints = round.points
+
+            // Everyone in the room played this game
+            // Check if this player was involved (winner, loser, or zimo participant)
+            const wasInvolved = isWinner || isLoser || (isZimo && round.win_type === 'zimo')
+
+            if (isWinner || isLoser || round.win_type === 'zimo') {
+                gamesPlayed += 1
+            }
+
+            if (isWinner) {
+                wins += 1
+                const actualWinnerPoints = isZimo ? (basePoints / 2) * 3 : basePoints
+                pointsWon += actualWinnerPoints
+                fanValue += round.fan_count
+
+                if (isZimo) {
+                    zimoWins += 1
+                } else {
+                    eatWins += 1
+                }
+
+                if (round.fan_count >= 10) {
+                    limitHands += 1
+                }
+
+                // Track pattern decrements
+                if (round.hand_patterns && round.hand_patterns.length > 0) {
+                    round.hand_patterns.forEach(patternId => {
+                        patternDecrements[patternId] = (patternDecrements[patternId] || 0) + 1
+                    })
+                }
+            } else if (round.win_type === 'eat' && isLoser) {
+                dealIns += 1
+                pointsLost += basePoints
+            } else if (round.win_type === 'zimo_bao' && isLoser) {
+                baoCount += 1
+                const baoLoss = (basePoints / 2) * 3
+                pointsLost += baoLoss
+            } else if (round.win_type === 'zimo' && !isWinner) {
+                // Zimo loser - check if this player was in the room
+                // For simplicity, we assume all 4 players lose in a zimo
+                // This is a limitation - we'd need room_players history for accuracy
+                const share = basePoints / 2
+                pointsLost += share
+            }
+        })
+
+        // Build updates (subtracting values)
+        const updates = {
+            total_games: Math.max(0, (stats.total_games || 0) - gamesPlayed),
+            total_wins: Math.max(0, (stats.total_wins || 0) - wins),
+            total_zimo: Math.max(0, (stats.total_zimo || 0) - zimoWins),
+            total_eat: Math.max(0, (stats.total_eat || 0) - eatWins),
+            total_points_won: Math.max(0, (stats.total_points_won || 0) - pointsWon),
+            total_points_lost: Math.max(0, (stats.total_points_lost || 0) - pointsLost),
+            total_fan_value: Math.max(0, (stats.total_fan_value || 0) - fanValue),
+            total_limit_hands: Math.max(0, (stats.total_limit_hands || 0) - limitHands),
+            total_deal_ins: Math.max(0, (stats.total_deal_ins || 0) - dealIns),
+            total_bao: Math.max(0, (stats.total_bao || 0) - baoCount),
+        }
+
+        // Decrement pattern counts
+        if (Object.keys(patternDecrements).length > 0) {
+            const patternCounts = { ...(stats.hand_pattern_counts || {}) }
+            Object.entries(patternDecrements).forEach(([patternId, count]) => {
+                patternCounts[patternId] = Math.max(0, (patternCounts[patternId] || 0) - count)
+                if (patternCounts[patternId] === 0) {
+                    delete patternCounts[patternId]
+                }
+            })
+            updates.hand_pattern_counts = patternCounts
+        }
+
+        await supabase
+            .from('player_stats')
+            .update(updates)
+            .eq('player_id', playerId)
+    }
+
+    // 4. Delete all game rounds for this room
+    const { error: roundsError } = await supabase
+        .from('game_rounds')
+        .delete()
+        .eq('room_id', roomId)
+
+    if (roundsError) throw roundsError
+
+    // 5. Delete all vacated seats for this room
+    const { error: vacatedError } = await supabase
+        .from('vacated_seats')
+        .delete()
+        .eq('room_id', roomId)
+
+    if (vacatedError) throw vacatedError
+
+    // 6. Delete all room players
+    const { error: playersError } = await supabase
+        .from('room_players')
+        .delete()
+        .eq('room_id', roomId)
+
+    if (playersError) throw playersError
+
+    // 7. Finally, delete the game room itself
+    const { error: roomError } = await supabase
+        .from('game_rooms')
+        .delete()
+        .eq('id', roomId)
+
+    if (roomError) throw roomError
+
+    return true
+}
+
+
+
 // Subscribe to room changes (real-time)
 export const subscribeToRoom = (roomId, callback) => {
     // Single channel for all room-related changes is more stable

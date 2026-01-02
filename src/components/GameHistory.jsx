@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { getPointsForFan } from '../lib/scoring'
+import { getPointsForFan, getWinnerPoints } from '../lib/scoring'
 
 const GameHistory = ({ isOpen, onClose, roomId, players, onUpdate }) => {
     const [rounds, setRounds] = useState([])
@@ -68,8 +68,8 @@ const GameHistory = ({ isOpen, onClose, roomId, players, onUpdate }) => {
                         .eq('player_id', loserId)
                 }
             } else if (winType === 'zimo' || winType === 'zimo_bao') {
+                const winnerPoints = getWinnerPoints(points, winType)
                 const halfPoints = points / 2
-                const winnerPoints = halfPoints * 3
 
                 // Reverse winner points
                 await supabase
@@ -155,9 +155,7 @@ const GameHistory = ({ isOpen, onClose, roomId, players, onUpdate }) => {
                         <div className="flex flex-col gap-2">
                             {rounds.map((round, index) => {
                                 // Calculate actual winner points
-                                const basePoints = round.points
-                                const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
-                                const winnerPoints = isZimo ? (basePoints / 2) * 3 : basePoints
+                                const winnerPoints = getWinnerPoints(round.points, round.win_type)
 
                                 return (
                                     <div

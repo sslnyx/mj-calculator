@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { ArrowLeft, Clock, Eye } from 'lucide-react'
+import { ArrowLeft, Clock, Eye, Trash2 } from 'lucide-react'
 import { getPlayerAvatar } from '../lib/avatar'
 import { getFirstName } from '../lib/names'
 import MatchDetailsModal from '../components/MatchDetailsModal'
 import { calculateRoundChanges } from '../lib/scoring'
+import { deleteRoom } from '../lib/rooms'
+import ConfirmModal from '../components/ConfirmModal'
 
 const HistoryPage = ({ onBack }) => {
     const { player } = useAuth()
@@ -14,6 +16,7 @@ const HistoryPage = ({ onBack }) => {
     const [refreshing, setRefreshing] = useState(false)
     const [selectedMatch, setSelectedMatch] = useState(null)
     const [myGamesOnly, setMyGamesOnly] = useState(true) // Filter: show only my games by default
+    const [deleteConfirm, setDeleteConfirm] = useState(null) // room_id to delete
 
     const fetchHistory = async (showRefresh = false) => {
         if (!player) return
@@ -154,6 +157,21 @@ const HistoryPage = ({ onBack }) => {
         }
     }
 
+    const handleDeleteMatch = async () => {
+        if (!deleteConfirm) return
+        const roomId = deleteConfirm
+        setDeleteConfirm(null)
+
+        try {
+            await deleteRoom(roomId)
+            // Refresh the list
+            fetchHistory(true)
+        } catch (error) {
+            console.error('Error deleting match:', error)
+            alert('刪除失敗')
+        }
+    }
+
     useEffect(() => {
         fetchHistory()
     }, [player, myGamesOnly]) // Re-fetch when filter changes
@@ -236,8 +254,19 @@ const HistoryPage = ({ onBack }) => {
                                             {formatDate(match.room.created_at)} · {match.rounds.length}局
                                         </div>
                                     </div>
-                                    <div className={`font-title text-xl ${match.playerPoints >= 0 ? 'text-green-bold' : 'text-red-bold'}`}>
-                                        {match.playerPoints >= 0 ? '+' : ''}{match.playerPoints}
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className={`font-title text-xl ${match.playerPoints >= 0 ? 'text-green-bold' : 'text-red-bold'}`}>
+                                            {match.playerPoints >= 0 ? '+' : ''}{match.playerPoints}
+                                        </div>
+                                        {player?.is_admin && (
+                                            <button
+                                                onClick={() => setDeleteConfirm(match.room.id)}
+                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                title="刪除對局"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -368,6 +397,15 @@ const HistoryPage = ({ onBack }) => {
                 onClose={() => setSelectedMatch(null)}
                 match={selectedMatch}
                 currentPlayerId={player?.id}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={deleteConfirm !== null}
+                title="刪除對局"
+                message="⚠️ 確定要刪除呢個對局? 所有數據將被永久刪除，無法恢復!"
+                onConfirm={handleDeleteMatch}
+                onCancel={() => setDeleteConfirm(null)}
             />
         </div>
     )
