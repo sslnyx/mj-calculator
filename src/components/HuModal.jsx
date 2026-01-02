@@ -17,6 +17,12 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState(null)
 
+    // Sort players by seat position for consistent display
+    const sortedPlayers = useMemo(() => {
+        return [...players].sort((a, b) => (a.seat_position || 0) - (b.seat_position || 0))
+    }, [players])
+
+
     // Calculate total fan from selected patterns
     const calculatedFan = useMemo(() => {
         if (selectedPatterns.length === 0 && fanZiCount === 0 && zhengHuaCount === 0) return null
@@ -281,7 +287,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                            {players.map(p => (
+                            {sortedPlayers.map(p => (
                                 <button
                                     key={p.player_id}
                                     className={`py-3 px-2 rounded-lg border-comic-thin font-bold text-sm transition-all ${winnerId === p.player_id
@@ -304,7 +310,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                         <div className="bg-red/10 border-2 border-red rounded-xl p-3">
                             <label className="block font-bold text-sm mb-2 uppercase">邊個出銃?</label>
                             <div className="grid grid-cols-2 gap-2">
-                                {players.map(p => (
+                                {sortedPlayers.map(p => (
                                     <button
                                         key={p.player_id}
                                         className={`py-3 px-2 rounded-lg border-comic-thin font-bold text-sm transition-all ${loserId === p.player_id
@@ -328,7 +334,7 @@ const HuModal = ({ isOpen, onClose, roomId, players, onSuccess, onNavigate }) =>
                         <div className="bg-red/10 border-2 border-red rounded-xl p-3">
                             <label className="block font-bold text-sm mb-2 uppercase">邊個包?</label>
                             <div className="grid grid-cols-2 gap-2">
-                                {players.map(p => (
+                                {sortedPlayers.map(p => (
                                     <button
                                         key={p.player_id}
                                         className={`py-3 px-2 rounded-lg border-comic-thin font-bold text-sm transition-all ${loserId === p.player_id

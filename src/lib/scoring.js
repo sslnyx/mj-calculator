@@ -113,6 +113,7 @@ export const calculateScoreTotals = (rounds, playersOrSeatMap) => {
 }
 
 // Update stats for ALL players in a round (Hexagon Warrior Metrics)
+// Optimized: Uses Promise.all for parallel operations
 const updateRoomStats = async ({
     roomPlayers,
     winnerId,
@@ -123,80 +124,106 @@ const updateRoomStats = async ({
     loserPoints,
     handPatterns = []
 }) => {
-    for (const player of roomPlayers) {
-        const pid = player.player_id
+    try {
+        // 1. Fetch all player stats in parallel
+        const statsResults = await Promise.all(
+            roomPlayers.map(player =>
+                supabase
+                    .from('player_stats')
+                    .select('*')
+                    .eq('player_id', player.player_id)
+                    .single()
+            )
+        )
 
-        // Fetch current stats
-        const { data: stats } = await supabase
-            .from('player_stats')
-            .select('*')
-            .eq('player_id', pid)
-            .single()
+        // 2. Build update operations
+        const updateOps = []
 
-        if (!stats) continue
+        roomPlayers.forEach((player, index) => {
+            const pid = player.player_id
+            const { data: stats, error: fetchError } = statsResults[index]
 
-        // Base update: everyone's round count increases
-        const updates = {
-            total_games: (stats.total_games || 0) + 1
-        }
-
-        // WINNER
-        if (pid === winnerId) {
-            const isZimo = winType === 'zimo' || winType === 'zimo_bao'
-            // For zimo, winner gets (basePoints / 2) * 3
-            // winnerPoints passed in should already be the BASE points
-            const actualWinnerPoints = isZimo ? (winnerPoints / 2) * 3 : winnerPoints
-
-            updates.total_wins = (stats.total_wins || 0) + 1
-            updates.total_points_won = (stats.total_points_won || 0) + actualWinnerPoints
-            updates.total_fan_value = (stats.total_fan_value || 0) + fanCount
-            updates.highest_fan = Math.max(stats.highest_fan || 0, fanCount)
-
-            if (isZimo) {
-                updates.total_zimo = (stats.total_zimo || 0) + 1
-            } else {
-                updates.total_eat = (stats.total_eat || 0) + 1
+            if (fetchError || !stats) {
+                console.error(`Error fetching stats for player ${pid}:`, fetchError)
+                return
             }
 
-            // Limit hand tracking (Fan >= 10)
-            if (fanCount >= 10) {
-                updates.total_limit_hands = (stats.total_limit_hands || 0) + 1
+            // Base update: everyone's round count increases
+            const updates = {
+                total_games: (stats.total_games || 0) + 1,
+                total_rounds_played: (stats.total_rounds_played || 0) + 1
             }
 
-            // Track hand pattern counts
-            if (handPatterns && handPatterns.length > 0) {
-                const patternCounts = stats.hand_pattern_counts || {}
-                handPatterns.forEach(patternId => {
-                    patternCounts[patternId] = (patternCounts[patternId] || 0) + 1
-                })
-                updates.hand_pattern_counts = patternCounts
-            }
-        }
-        // DEAL-IN LOSER
-        else if (winType === 'eat' && pid === loserId) {
-            updates.total_deal_ins = (stats.total_deal_ins || 0) + 1
-            updates.total_points_lost = (stats.total_points_lost || 0) + loserPoints
-        }
-        // BAO LOSER - pays the full zimo amount
-        else if (winType === 'zimo_bao' && pid === loserId) {
-            updates.total_bao = (stats.total_bao || 0) + 1
-            // Bao loser pays (basePoints / 2) * 3
-            const baoLoss = (winnerPoints / 2) * 3
-            updates.total_points_lost = (stats.total_points_lost || 0) + baoLoss
-        }
-        // ZIMO LOSER (everyone else pays half the base)
-        else if (winType === 'zimo' && pid !== winnerId) {
-            // Each loser pays (basePoints / 2)
-            const share = winnerPoints / 2
-            updates.total_points_lost = (stats.total_points_lost || 0) + share
-        }
 
-        await supabase
-            .from('player_stats')
-            .update(updates)
-            .eq('player_id', pid)
+
+            // WINNER
+            if (pid === winnerId) {
+                const isZimo = winType === 'zimo' || winType === 'zimo_bao'
+                const actualWinnerPoints = isZimo ? (winnerPoints / 2) * 3 : winnerPoints
+
+                updates.total_wins = (stats.total_wins || 0) + 1
+                updates.total_points_won = (stats.total_points_won || 0) + actualWinnerPoints
+                updates.total_fan_value = (stats.total_fan_value || 0) + fanCount
+                updates.highest_fan = Math.max(stats.highest_fan || 0, fanCount)
+
+                if (isZimo) {
+                    updates.total_zimo = (stats.total_zimo || 0) + 1
+                } else {
+                    updates.total_eat = (stats.total_eat || 0) + 1
+                }
+
+                if (fanCount >= 10) {
+                    updates.total_limit_hands = (stats.total_limit_hands || 0) + 1
+                }
+
+                if (handPatterns && handPatterns.length > 0) {
+                    const patternCounts = { ...(stats.hand_pattern_counts || {}) }
+                    handPatterns.forEach(patternId => {
+                        patternCounts[patternId] = (patternCounts[patternId] || 0) + 1
+                    })
+                    updates.hand_pattern_counts = patternCounts
+                }
+            }
+            // DEAL-IN LOSER
+            else if (winType === 'eat' && pid === loserId) {
+                updates.total_deal_ins = (stats.total_deal_ins || 0) + 1
+                updates.total_points_lost = (stats.total_points_lost || 0) + loserPoints
+            }
+            // BAO LOSER
+            else if (winType === 'zimo_bao' && pid === loserId) {
+                updates.total_bao = (stats.total_bao || 0) + 1
+                const baoLoss = (winnerPoints / 2) * 3
+                updates.total_points_lost = (stats.total_points_lost || 0) + baoLoss
+            }
+            // ZIMO LOSER
+            else if (winType === 'zimo' && pid !== winnerId) {
+                const share = winnerPoints / 2
+                updates.total_points_lost = (stats.total_points_lost || 0) + share
+            }
+
+            updateOps.push(
+                supabase
+                    .from('player_stats')
+                    .update(updates)
+                    .eq('player_id', pid)
+                    .then(({ error }) => {
+                        if (error) console.error(`Error updating stats for player ${pid}:`, error)
+                        return { pid, error }
+                    })
+            )
+        })
+
+        // 3. Execute all updates in parallel
+        if (updateOps.length > 0) {
+            await Promise.all(updateOps)
+        }
+    } catch (err) {
+        console.error('Critical error in updateRoomStats:', err)
+        // We don't throw here to avoid failing the whole round record process 
+        // if just stats fail, but we log it.
     }
 }
+
 
 // Record a direct win (eat/dianpao)
 export const recordDirectWin = async ({
@@ -207,95 +234,113 @@ export const recordDirectWin = async ({
     handPatterns = [],
     roomPlayers
 }) => {
-    const points = getPointsForFan(fanCount)
+    try {
+        const points = getPointsForFan(fanCount)
 
-    // Create game round record
-    const { data: round, error: roundError } = await supabase
-        .from('game_rounds')
-        .insert({
-            room_id: roomId,
-            round_number: 1,
-            winner_id: winnerId,
-            loser_id: loserId,
-            win_type: 'eat',
-            fan_count: fanCount,
-            points: points,
-            hand_patterns: handPatterns
-        })
-        .select()
-        .single()
-
-    if (roundError) throw roundError
-
-    // === Update Current Points in DB ===
-    // We update BOTH room_players AND vacated_seats to ensure balance
-    const updatePoints = async (pid, change) => {
-        // Try active players first
-        const { data: updatedPlayer } = await supabase
-            .from('room_players')
-            .select('current_points')
-            .eq('room_id', roomId)
-            .eq('player_id', pid)
+        // 1. Create game round record
+        const { data: round, error: roundError } = await supabase
+            .from('game_rounds')
+            .insert({
+                room_id: roomId,
+                round_number: 1,
+                winner_id: winnerId,
+                loser_id: loserId,
+                win_type: 'eat',
+                fan_count: fanCount,
+                points: points,
+                hand_patterns: handPatterns
+            })
+            .select()
             .single()
 
-        if (updatedPlayer) {
-            await supabase
+        if (roundError) {
+            console.error('Error creating round:', roundError)
+            throw new Error(`Failed to create round: ${roundError.message}`)
+        }
+
+        // 2. Update Current Points in DB
+        const updatePoints = async (pid, change) => {
+            if (!pid) return
+
+            // Try active players first
+            const { data: updatedPlayer, error: fetchError } = await supabase
                 .from('room_players')
-                .update({ current_points: (updatedPlayer.current_points || 0) + change })
-                .eq('room_id', roomId)
-                .eq('player_id', pid)
-        } else {
-            // Try vacated seats
-            const { data: updatedVacated } = await supabase
-                .from('vacated_seats')
                 .select('current_points')
                 .eq('room_id', roomId)
                 .eq('player_id', pid)
                 .single()
 
-            if (updatedVacated) {
-                await supabase
-                    .from('vacated_seats')
-                    .update({ current_points: (updatedVacated.current_points || 0) + change })
+            if (updatedPlayer) {
+                const { error: updateError } = await supabase
+                    .from('room_players')
+                    .update({ current_points: (updatedPlayer.current_points || 0) + change })
                     .eq('room_id', roomId)
                     .eq('player_id', pid)
+                if (updateError) console.error(`Error updating room_players point for ${pid}:`, updateError)
+            } else {
+                // Try vacated seats
+                const { data: updatedVacated, error: fetchVacatedError } = await supabase
+                    .from('vacated_seats')
+                    .select('current_points')
+                    .eq('room_id', roomId)
+                    .eq('player_id', pid)
+                    .single()
+
+                if (updatedVacated) {
+                    const { error: updateVacatedError } = await supabase
+                        .from('vacated_seats')
+                        .update({ current_points: (updatedVacated.current_points || 0) + change })
+                        .eq('room_id', roomId)
+                        .eq('player_id', pid)
+                    if (updateVacatedError) console.error(`Error updating vacated_seats point for ${pid}:`, updateVacatedError)
+                } else {
+                    console.error(`Player ${pid} not found in room_players or vacated_seats`)
+                }
             }
         }
+
+        await Promise.all([
+            updatePoints(winnerId, points),
+            updatePoints(loserId, -points)
+        ])
+
+        // 3. Fetch vacated seats to include in stats update
+        const { data: vacatedSeats, error: vacatedError } = await supabase
+            .from('vacated_seats')
+            .select('player_id, seat_position, current_points')
+            .eq('room_id', roomId)
+
+        if (vacatedError) console.error('Error fetching vacated seats for stats update:', vacatedError)
+
+        // Merge active + vacated players for complete stats update
+        const allPlayers = [
+            ...roomPlayers,
+            ...(vacatedSeats || []).map(vs => ({
+                player_id: vs.player_id,
+                seat_position: vs.seat_position,
+                current_points: vs.current_points
+            }))
+        ]
+
+        // 4. Update lifetime stats for ALL players (including vacated)
+        await updateRoomStats({
+            roomPlayers: allPlayers,
+            winnerId,
+            loserId,
+            winType: 'eat',
+            fanCount,
+            winnerPoints: points,
+            loserPoints: points,
+            handPatterns
+        })
+
+        return { round, points }
+    } catch (err) {
+        console.error('Failed to record direct win:', err)
+        throw err
     }
-
-    await updatePoints(winnerId, points)
-    await updatePoints(loserId, -points)
-
-    // Fetch vacated seats to include in stats update
-    const { data: vacatedSeats } = await supabase
-        .from('vacated_seats')
-        .select('player_id, seat_position, current_points')
-        .eq('room_id', roomId)
-
-    // Merge active + vacated players for complete stats update
-    const allPlayers = [
-        ...roomPlayers,
-        ...(vacatedSeats || []).map(vs => ({
-            player_id: vs.player_id,
-            seat_position: vs.seat_position,
-            current_points: vs.current_points
-        }))
-    ]
-
-    // Update lifetime stats for ALL players (including vacated)
-    await updateRoomStats({
-        roomPlayers: allPlayers,
-        winnerId,
-        loserId,
-        winType: 'eat',
-        fanCount,
-        winnerPoints: points,
-        loserPoints: points,
-        handPatterns
-    })
-
-    return { round, points }
 }
+
 
 // Record a self-draw win (zimo)
 export const recordZimo = async ({
@@ -306,130 +351,152 @@ export const recordZimo = async ({
     baoPlayerId,
     roomPlayers
 }) => {
-    const basePoints = getPointsForFan(fanCount)
-    const halfPoints = basePoints / 2
-    const winnerPoints = halfPoints * 3
+    try {
+        const basePoints = getPointsForFan(fanCount)
+        const halfPoints = basePoints / 2
+        const winnerPoints = halfPoints * 3
 
-    // Create game round record
-    const { data: round, error: roundError } = await supabase
-        .from('game_rounds')
-        .insert({
-            room_id: roomId,
-            round_number: 1,
-            winner_id: winnerId,
-            loser_id: baoPlayerId || null,
-            win_type: baoPlayerId ? 'zimo_bao' : 'zimo',
-            fan_count: fanCount,
-            points: basePoints,
-            hand_patterns: handPatterns
-        })
-        .select()
-        .single()
-
-    if (roundError) throw roundError
-
-    // === Update Current Points in DB ===
-    const updatePoints = async (pid, change) => {
-        const { data: updatedPlayer } = await supabase
-            .from('room_players')
-            .select('current_points')
-            .eq('room_id', roomId)
-            .eq('player_id', pid)
+        // 1. Create game round record
+        const { data: round, error: roundError } = await supabase
+            .from('game_rounds')
+            .insert({
+                room_id: roomId,
+                round_number: 1,
+                winner_id: winnerId,
+                loser_id: baoPlayerId || null,
+                win_type: baoPlayerId ? 'zimo_bao' : 'zimo',
+                fan_count: fanCount,
+                points: basePoints,
+                hand_patterns: handPatterns
+            })
+            .select()
             .single()
 
-        if (updatedPlayer) {
-            await supabase
+        if (roundError) {
+            console.error('Error creating zimo round:', roundError)
+            throw new Error(`Failed to create zimo round: ${roundError.message}`)
+        }
+
+        // 2. Update Current Points in DB
+        const updatePoints = async (pid, change) => {
+            if (!pid) return
+
+            // Try active players first
+            const { data: updatedPlayer, error: fetchError } = await supabase
                 .from('room_players')
-                .update({ current_points: (updatedPlayer.current_points || 0) + change })
-                .eq('room_id', roomId)
-                .eq('player_id', pid)
-        } else {
-            const { data: updatedVacated } = await supabase
-                .from('vacated_seats')
                 .select('current_points')
                 .eq('room_id', roomId)
                 .eq('player_id', pid)
                 .single()
 
-            if (updatedVacated) {
-                await supabase
-                    .from('vacated_seats')
-                    .update({ current_points: (updatedVacated.current_points || 0) + change })
+            if (updatedPlayer) {
+                const { error: updateError } = await supabase
+                    .from('room_players')
+                    .update({ current_points: (updatedPlayer.current_points || 0) + change })
                     .eq('room_id', roomId)
                     .eq('player_id', pid)
-            }
-        }
-    }
-
-    // Winner gains
-    await updatePoints(winnerId, winnerPoints)
-
-    if (baoPlayerId) {
-        // Bao: One player pays all
-        await updatePoints(baoPlayerId, -winnerPoints)
-    } else {
-        // Standard Zimo: Use historical seat map if possible, but for current game
-        // we pay based on the seats. We need to identify who is in seats 1-4.
-        const allSeats = [1, 2, 3, 4]
-        // Get winner's seat
-        const winnerSeat = roomPlayers.find(p => p.player_id === winnerId)?.seat_position
-
-        // We need to charge every other seat, even if the player is currently vacated
-        // The recordZimo function has roomPlayers, but it might not have the vacated ones.
-        // For standard Zimo, we'll try to find whoever is in the other seats.
-
-        // Fetch all current occupants including vacated
-        const { data: currentVacated } = await supabase
-            .from('vacated_seats')
-            .select('player_id, seat_position')
-            .eq('room_id', roomId)
-
-        for (const seat of allSeats) {
-            if (seat === winnerSeat) continue
-
-            // Pay share
-            const share = halfPoints
-
-            // Check active room_players
-            const activeP = roomPlayers.find(p => p.seat_position === seat)
-            if (activeP) {
-                await updatePoints(activeP.player_id, -share)
+                if (updateError) console.error(`Error updating room_players point for ${pid}:`, updateError)
             } else {
-                // Check vacated
-                const vacatedP = currentVacated?.find(v => v.seat_position === seat)
-                if (vacatedP) {
-                    await updatePoints(vacatedP.player_id, -share)
+                // Try vacated seats
+                const { data: updatedVacated, error: fetchVacatedError } = await supabase
+                    .from('vacated_seats')
+                    .select('current_points')
+                    .eq('room_id', roomId)
+                    .eq('player_id', pid)
+                    .single()
+
+                if (updatedVacated) {
+                    const { error: updateVacatedError } = await supabase
+                        .from('vacated_seats')
+                        .update({ current_points: (updatedVacated.current_points || 0) + change })
+                        .eq('room_id', roomId)
+                        .eq('player_id', pid)
+                    if (updateVacatedError) console.error(`Error updating vacated_seats point for ${pid}:`, updateVacatedError)
+                } else {
+                    console.error(`Player ${pid} not found in room_players or vacated_seats`)
                 }
             }
         }
+
+        // Winner gains
+        await updatePoints(winnerId, winnerPoints)
+
+        // Fetch vacated seats for both point updates and stats updates
+        const { data: currentVacated, error: fetchVacatedError } = await supabase
+            .from('vacated_seats')
+            .select('player_id, seat_position, current_points')
+            .eq('room_id', roomId)
+
+        if (fetchVacatedError) console.error('Error fetching vacated seats for zimo processing:', fetchVacatedError)
+
+        if (baoPlayerId) {
+            // Bao: One player pays all
+            await updatePoints(baoPlayerId, -winnerPoints)
+        } else {
+            // Standard Zimo: Use historical seat map if possible, but for current game
+            // we pay based on the seats. We need to identify who is in seats 1-4.
+            const allSeats = [1, 2, 3, 4]
+            // Get winner's seat
+            const winnerSeat = roomPlayers.find(p => p.player_id === winnerId)?.seat_position
+
+            const loserUpdates = []
+            for (const seat of allSeats) {
+                if (seat === winnerSeat) continue
+
+                // Pay share
+                const share = halfPoints
+
+                // Check active room_players
+                const activeP = roomPlayers.find(p => p.seat_position === seat)
+                if (activeP) {
+                    loserUpdates.push(updatePoints(activeP.player_id, -share))
+                } else {
+                    // Check vacated
+                    const vacatedP = currentVacated?.find(v => v.seat_position === seat)
+                    if (vacatedP) {
+                        loserUpdates.push(updatePoints(vacatedP.player_id, -share))
+                    } else {
+                        console.error(`No player found in seat ${seat} for zimo payment`)
+                    }
+                }
+            }
+            if (loserUpdates.length > 0) {
+                await Promise.all(loserUpdates)
+            }
+        }
+
+        // Merge active + vacated players for complete stats update
+        const allPlayers = [
+            ...roomPlayers,
+            ...(currentVacated || []).map(vs => ({
+                player_id: vs.player_id,
+                seat_position: vs.seat_position,
+                current_points: vs.current_points
+            }))
+        ]
+
+
+        // Update lifetime stats for ALL players (including vacated)
+        await updateRoomStats({
+            roomPlayers: allPlayers,
+            winnerId,
+            loserId: baoPlayerId || null,
+            winType: baoPlayerId ? 'zimo_bao' : 'zimo',
+            fanCount,
+            winnerPoints,
+            loserPoints: winnerPoints,
+            handPatterns
+        })
+
+        return { round, winnerPoints }
+    } catch (err) {
+        console.error('Failed to record zimo win:', err)
+        throw err
     }
-
-    // Merge active + vacated players for complete stats update
-    const allPlayers = [
-        ...roomPlayers,
-        ...(currentVacated || []).map(vs => ({
-            player_id: vs.player_id,
-            seat_position: vs.seat_position,
-            current_points: 0 // Not needed for stats, just structure
-        }))
-    ]
-
-    // Update lifetime stats for ALL players (including vacated)
-    await updateRoomStats({
-        roomPlayers: allPlayers,
-        winnerId,
-        loserId: baoPlayerId || null,
-        winType: baoPlayerId ? 'zimo_bao' : 'zimo',
-        fanCount,
-        winnerPoints,
-        loserPoints: winnerPoints,
-        handPatterns
-    })
-
-    return { round, winnerPoints }
 }
 
 // Delete a round and reverse all points and stats - SINGLE SOURCE OF TRUTH
+// Optimized: Uses Promise.all for parallel operations
 export const deleteRound = async (round, roomId, roomPlayers, vacatedSeats = []) => {
     const { points, win_type, winner_id, loser_id, fan_count, hand_patterns } = round
     const isZimo = win_type === 'zimo' || win_type === 'zimo_bao'
@@ -446,71 +513,118 @@ export const deleteRound = async (round, roomId, roomPlayers, vacatedSeats = [])
         }))
     ]
 
-    // Helper to update points for a player (room_players or vacated_seats)
-    const updatePoints = async (playerId, change) => {
-        // Try room_players first
-        const activePlayer = roomPlayers.find(p => p.player_id === playerId)
-        if (activePlayer) {
-            await supabase
-                .from('room_players')
-                .update({ current_points: (activePlayer.current_points || 0) + change })
-                .eq('room_id', roomId)
-                .eq('player_id', playerId)
-        } else {
-            // Try vacated_seats
-            const vacated = vacatedSeats?.find(vs => vs.player_id === playerId)
-            if (vacated) {
-                await supabase
-                    .from('vacated_seats')
-                    .update({ current_points: (vacated.current_points || 0) + change })
-                    .eq('room_id', roomId)
-                    .eq('player_id', playerId)
-            }
-        }
-    }
-
     // 1. Reverse current_points
-    if (win_type === 'eat') {
-        await updatePoints(winner_id, -points)
-        if (loser_id) await updatePoints(loser_id, points)
-    } else if (isZimo) {
-        await updatePoints(winner_id, -actualWinnerPoints)
+    // We fetch latest points from DB to ensure accuracy even if UI is stale
+    const updatePointReversal = async (playerId, change) => {
+        if (!playerId) return
 
-        if (win_type === 'zimo_bao' && loser_id) {
-            await updatePoints(loser_id, actualWinnerPoints)
-        } else {
-            // All other players get back half points
-            for (const p of allPlayers) {
-                if (p.player_id !== winner_id) {
-                    await updatePoints(p.player_id, halfPoints)
-                }
-            }
-        }
-    }
-
-    // 2. Reverse player_stats for all players
-    for (const player of allPlayers) {
-        const pid = player.player_id
-        if (!pid) continue
-
-        const { data: stats } = await supabase
-            .from('player_stats')
-            .select('*')
-            .eq('player_id', pid)
+        // Try active players first
+        const { data: activeP, error: activeError } = await supabase
+            .from('room_players')
+            .select('current_points')
+            .eq('room_id', roomId)
+            .eq('player_id', playerId)
             .single()
 
-        if (!stats) continue
+        if (activeP) {
+            const { error } = await supabase
+                .from('room_players')
+                .update({ current_points: (activeP.current_points || 0) + change })
+                .eq('room_id', roomId)
+                .eq('player_id', playerId)
+            if (error) console.error(`Error reversing points for active player ${playerId}:`, error)
+        } else {
+            // Try vacated seats
+            const { data: vacatedP, error: vacatedError } = await supabase
+                .from('vacated_seats')
+                .select('current_points')
+                .eq('room_id', roomId)
+                .eq('player_id', playerId)
+                .single()
 
-        // Base update: everyone's round count decreases
-        const updates = {
-            total_games: Math.max(0, (stats.total_games || 0) - 1)
+            if (vacatedP) {
+                const { error } = await supabase
+                    .from('vacated_seats')
+                    .update({ current_points: (vacatedP.current_points || 0) + change })
+                    .eq('room_id', roomId)
+                    .eq('player_id', playerId)
+                if (error) console.error(`Error reversing points for vacated player ${playerId}:`, error)
+            } else {
+                console.error(`Player ${playerId} not found in room roster for point reversal`)
+            }
+        }
+    }
+
+    const pointUpdatePromises = []
+
+    if (win_type === 'eat') {
+        pointUpdatePromises.push(updatePointReversal(winner_id, -points))
+        if (loser_id) pointUpdatePromises.push(updatePointReversal(loser_id, points))
+    } else if (isZimo) {
+        pointUpdatePromises.push(updatePointReversal(winner_id, -actualWinnerPoints))
+        if (win_type === 'zimo_bao' && loser_id) {
+            pointUpdatePromises.push(updatePointReversal(loser_id, actualWinnerPoints))
+        } else {
+            // Standard Zimo: Reverse points for the 3 players in the other seats
+            const allSeats = [1, 2, 3, 4]
+            const winnerSeat = allPlayers.find(p => p.player_id === winner_id)?.seat_position
+
+            allSeats.forEach(seat => {
+                if (seat === winnerSeat) return
+                const p = allPlayers.find(pl => pl.seat_position === seat)
+                if (p) {
+                    pointUpdatePromises.push(updatePointReversal(p.player_id, halfPoints))
+                }
+            })
+        }
+    }
+
+    // Execute all point updates in parallel
+    try {
+        if (pointUpdatePromises.length > 0) {
+            await Promise.all(pointUpdatePromises)
+        }
+    } catch (err) {
+        console.error('Error reversing points in deleteRound:', err)
+        throw new Error(`Failed to reverse points: ${err.message}`)
+    }
+
+
+    // 2. Reverse player_stats - fetch all in parallel
+    const validPlayers = allPlayers.filter(p => p.player_id)
+    const statsResults = await Promise.all(
+        validPlayers.map(player =>
+            supabase
+                .from('player_stats')
+                .select('*')
+                .eq('player_id', player.player_id)
+                .single()
+        )
+    )
+
+    // Build stats update operations
+    const statsUpdates = []
+
+    validPlayers.forEach((player, index) => {
+        const pid = player.player_id
+        const { data: stats, error: fetchError } = statsResults[index]
+
+        if (fetchError || !stats) {
+            console.error(`Error fetching stats for player ${pid} in deleteRound:`, fetchError)
+            return
         }
 
-        // WINNER reversal
+        const updates = {
+            total_games: Math.max(0, (stats.total_games || 0) - 1),
+            total_rounds_played: Math.max(0, (stats.total_rounds_played || 0) - 1)
+        }
+
+
+
         if (pid === winner_id) {
             updates.total_wins = Math.max(0, (stats.total_wins || 0) - 1)
             updates.total_points_won = Math.max(0, (stats.total_points_won || 0) - actualWinnerPoints)
-            updates.total_fan_value = Math.max(0, (stats.total_fan_value || 0) - (fan_count || 0))
+            updates.total_fan_value = Math.max(0, (stats.total_fan_value || 0) - fan_count)
 
             if (isZimo) {
                 updates.total_zimo = Math.max(0, (stats.total_zimo || 0) - 1)
@@ -518,53 +632,65 @@ export const deleteRound = async (round, roomId, roomPlayers, vacatedSeats = [])
                 updates.total_eat = Math.max(0, (stats.total_eat || 0) - 1)
             }
 
-            if ((fan_count || 0) >= 10) {
+            if (fan_count >= 10) {
                 updates.total_limit_hands = Math.max(0, (stats.total_limit_hands || 0) - 1)
             }
 
-            // Reverse hand pattern counts
             if (hand_patterns && hand_patterns.length > 0) {
                 const patternCounts = { ...(stats.hand_pattern_counts || {}) }
                 hand_patterns.forEach(patternId => {
-                    if (patternCounts[patternId]) {
-                        patternCounts[patternId] = Math.max(0, patternCounts[patternId] - 1)
-                        if (patternCounts[patternId] === 0) {
-                            delete patternCounts[patternId]
-                        }
+                    patternCounts[patternId] = Math.max(0, (patternCounts[patternId] || 0) - 1)
+                    if (patternCounts[patternId] === 0) {
+                        delete patternCounts[patternId]
                     }
                 })
                 updates.hand_pattern_counts = patternCounts
             }
-        }
-        // DEAL-IN LOSER reversal
-        else if (win_type === 'eat' && pid === loser_id) {
+        } else if (win_type === 'eat' && pid === loser_id) {
             updates.total_deal_ins = Math.max(0, (stats.total_deal_ins || 0) - 1)
             updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - points)
-        }
-        // BAO LOSER reversal
-        else if (win_type === 'zimo_bao' && pid === loser_id) {
+        } else if (win_type === 'zimo_bao' && pid === loser_id) {
             updates.total_bao = Math.max(0, (stats.total_bao || 0) - 1)
-            updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - actualWinnerPoints)
-        }
-        // ZIMO LOSER reversal (everyone else)
-        else if (win_type === 'zimo' && pid !== winner_id) {
-            updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - halfPoints)
+            const baoLoss = (points / 2) * 3
+            updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - baoLoss)
+        } else if (win_type === 'zimo' && pid !== winner_id) {
+            const share = points / 2
+            updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - share)
         }
 
-        await supabase
-            .from('player_stats')
-            .update(updates)
-            .eq('player_id', pid)
+        statsUpdates.push(
+            supabase
+                .from('player_stats')
+                .update(updates)
+                .eq('player_id', pid)
+                .then(({ error }) => {
+                    if (error) console.error(`Error reversing stats for player ${pid}:`, error)
+                    return { pid, error }
+                })
+        )
+    })
+
+    // Execute all stats updates in parallel
+    try {
+        if (statsUpdates.length > 0) {
+            await Promise.all(statsUpdates)
+        }
+    } catch (err) {
+        console.error('Critical error reversing stats in deleteRound:', err)
+        // We log but don't throw to avoid failing the round deletion if just stats reversal fails
     }
 
-    // 3. Delete the round from database
-    const { error } = await supabase
+    // 3. Finally delete the round record
+    const { error: deleteError } = await supabase
         .from('game_rounds')
         .delete()
+        .eq('room_id', roomId)
         .eq('id', round.id)
 
-    if (error) throw error
+    if (deleteError) {
+        console.error('Error deleting round record:', deleteError)
+        throw deleteError
+    }
 
     return true
 }
-

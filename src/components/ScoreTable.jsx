@@ -83,14 +83,14 @@ const ScoreTable = ({ onUpdate }) => {
         <div className="h-full flex flex-col">
             {/* Header - Player Names */}
             <div className="shrink-0 bg-gradient-to-r from-purple-600 to-purple-500 px-2 py-3 rounded-t-lg">
-                <div className="flex items-center">
+                <div className="flex items-start">
                     <div className="w-10 text-center text-xs font-bold text-black">#</div>
                     {[1, 2, 3, 4].map(seat => (
                         <div
                             key={seat}
-                            className="flex-1 text-center"
+                            className="flex-1 text-center px-1"
                         >
-                            <span className="font-bold truncate text-black">
+                            <span className="font-bold text-black text-sm leading-tight break-words">
                                 {getPlayerName(seat)}
                             </span>
                         </div>
@@ -98,6 +98,7 @@ const ScoreTable = ({ onUpdate }) => {
                     <div className="w-8"></div>
                 </div>
             </div>
+
 
             {/* Scrollable Rows */}
             <div className="flex-1 overflow-auto">

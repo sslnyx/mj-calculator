@@ -475,7 +475,42 @@ export const startGame = async (roomId, hostId) => {
         .maybeSingle()
 
     if (error) throw error
+
+    // Increment total_matches for all players in the room (non-spectators)
+    const { data: roomPlayers } = await supabase
+        .from('room_players')
+        .select('player_id')
+        .eq('room_id', roomId)
+        .eq('is_spectator', false)
+
+    if (roomPlayers?.length > 0) {
+        const matchUpdatePromises = roomPlayers.map(rp =>
+            supabase.rpc('increment_stat', {
+                p_id: rp.player_id,
+                stat_col: 'total_matches',
+                inc_val: 1
+            })
+        )
+        // We use a helper RPC if available, or just standard updates
+        // Since I don't know if RPC exists, I'll use standard updates with a fetch
+        await Promise.all(roomPlayers.map(async (rp) => {
+            const { data: stats } = await supabase
+                .from('player_stats')
+                .select('total_matches')
+                .eq('player_id', rp.player_id)
+                .single()
+
+            if (stats) {
+                await supabase
+                    .from('player_stats')
+                    .update({ total_matches: (stats.total_matches || 0) + 1 })
+                    .eq('player_id', rp.player_id)
+            }
+        }))
+    }
+
     return data
+
 }
 
 // End the game
@@ -577,16 +612,24 @@ export const deleteRoom = async (roomId) => {
     roomPlayers?.forEach(rp => { if (rp.player_id) playerIds.add(rp.player_id) })
     vacatedSeats?.forEach(vs => { if (vs.player_id) playerIds.add(vs.player_id) })
 
-    // 3. For each player, reverse their stats based on rounds
-    for (const playerId of playerIds) {
-        // Fetch current stats
-        const { data: stats } = await supabase
-            .from('player_stats')
-            .select('*')
-            .eq('player_id', playerId)
-            .single()
+    // 3. Reverse player stats - fetch all in parallel
+    const playerIdArray = Array.from(playerIds)
+    const statsResults = await Promise.all(
+        playerIdArray.map(playerId =>
+            supabase
+                .from('player_stats')
+                .select('*')
+                .eq('player_id', playerId)
+                .single()
+        )
+    )
 
-        if (!stats) continue
+    // Build stats updates array
+    const statsUpdates = []
+
+    playerIdArray.forEach((playerId, index) => {
+        const { data: stats } = statsResults[index]
+        if (!stats) return
 
         // Calculate what to subtract
         let gamesPlayed = 0
@@ -601,17 +644,22 @@ export const deleteRoom = async (roomId) => {
         let baoCount = 0
         const patternDecrements = {}
 
+        // Create set of confirmed room participants (current roster at end of game)
+        // Only these players should have zimo losses counted
+        const confirmedRosterIds = new Set([
+            ...roomPlayers?.map(rp => rp.player_id).filter(Boolean) || [],
+            ...vacatedSeats?.map(vs => vs.player_id).filter(Boolean) || []
+        ])
+
         rounds?.forEach(round => {
             const isWinner = round.winner_id === playerId
             const isLoser = round.loser_id === playerId
             const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
             const basePoints = round.points
+            // Only count participation if player was winner, loser, or confirmed in room for zimo
+            const wasInRosterForZimo = confirmedRosterIds.has(playerId)
 
-            // Everyone in the room played this game
-            // Check if this player was involved (winner, loser, or zimo participant)
-            const wasInvolved = isWinner || isLoser || (isZimo && round.win_type === 'zimo')
-
-            if (isWinner || isLoser || round.win_type === 'zimo') {
+            if (isWinner || isLoser || (round.win_type === 'zimo' && wasInRosterForZimo)) {
                 gamesPlayed += 1
             }
 
@@ -631,7 +679,6 @@ export const deleteRoom = async (roomId) => {
                     limitHands += 1
                 }
 
-                // Track pattern decrements
                 if (round.hand_patterns && round.hand_patterns.length > 0) {
                     round.hand_patterns.forEach(patternId => {
                         patternDecrements[patternId] = (patternDecrements[patternId] || 0) + 1
@@ -644,16 +691,14 @@ export const deleteRoom = async (roomId) => {
                 baoCount += 1
                 const baoLoss = (basePoints / 2) * 3
                 pointsLost += baoLoss
-            } else if (round.win_type === 'zimo' && !isWinner) {
-                // Zimo loser - check if this player was in the room
-                // For simplicity, we assume all 4 players lose in a zimo
-                // This is a limitation - we'd need room_players history for accuracy
+            } else if (round.win_type === 'zimo' && !isWinner && wasInRosterForZimo) {
+                // Only count zimo loss if player was confirmed in the room roster
                 const share = basePoints / 2
                 pointsLost += share
             }
         })
 
-        // Build updates (subtracting values)
+
         const updates = {
             total_games: Math.max(0, (stats.total_games || 0) - gamesPlayed),
             total_wins: Math.max(0, (stats.total_wins || 0) - wins),
@@ -667,7 +712,6 @@ export const deleteRoom = async (roomId) => {
             total_bao: Math.max(0, (stats.total_bao || 0) - baoCount),
         }
 
-        // Decrement pattern counts
         if (Object.keys(patternDecrements).length > 0) {
             const patternCounts = { ...(stats.hand_pattern_counts || {}) }
             Object.entries(patternDecrements).forEach(([patternId, count]) => {
@@ -679,10 +723,25 @@ export const deleteRoom = async (roomId) => {
             updates.hand_pattern_counts = patternCounts
         }
 
-        await supabase
-            .from('player_stats')
-            .update(updates)
-            .eq('player_id', playerId)
+        statsUpdates.push(
+            supabase
+                .from('player_stats')
+                .update(updates)
+                .eq('player_id', playerId)
+        )
+    })
+
+    // Execute all stats updates in parallel
+    try {
+        if (statsUpdates.length > 0) {
+            const results = await Promise.all(statsUpdates)
+            results.forEach((res, idx) => {
+                if (res.error) console.error(`Error reversing stats for player ${playerIdArray[idx]}:`, res.error)
+            })
+        }
+    } catch (err) {
+        console.error('Critical error reversing stats in deleteRoom:', err)
+        // Keep going to delete the room data even if stats reversal fails partially
     }
 
     // 4. Delete all game rounds for this room
@@ -691,7 +750,10 @@ export const deleteRoom = async (roomId) => {
         .delete()
         .eq('room_id', roomId)
 
-    if (roundsError) throw roundsError
+    if (roundsError) {
+        console.error('Error deleting rounds:', roundsError)
+        throw roundsError
+    }
 
     // 5. Delete all vacated seats for this room
     const { error: vacatedError } = await supabase
@@ -699,7 +761,10 @@ export const deleteRoom = async (roomId) => {
         .delete()
         .eq('room_id', roomId)
 
-    if (vacatedError) throw vacatedError
+    if (vacatedError) {
+        console.error('Error deleting vacated seats:', vacatedError)
+        throw vacatedError
+    }
 
     // 6. Delete all room players
     const { error: playersError } = await supabase
@@ -707,7 +772,10 @@ export const deleteRoom = async (roomId) => {
         .delete()
         .eq('room_id', roomId)
 
-    if (playersError) throw playersError
+    if (playersError) {
+        console.error('Error deleting room players:', playersError)
+        throw playersError
+    }
 
     // 7. Finally, delete the game room itself
     const { error: roomError } = await supabase
@@ -715,10 +783,14 @@ export const deleteRoom = async (roomId) => {
         .delete()
         .eq('id', roomId)
 
-    if (roomError) throw roomError
+    if (roomError) {
+        console.error('Error deleting room:', roomError)
+        throw roomError
+    }
 
     return true
 }
+
 
 
 

@@ -106,5 +106,7 @@ export const calculateHexagonData = (stats) => {
     const baoRate = ((stats.total_bao || 0) / rounds) * 100
     const sanity = Math.max(0, 100 - (baoRate / 10) * 100)
 
+
+
     return [speed, attack, defense, luck, magic, sanity]
 }

@@ -71,25 +71,16 @@ const ProfilePage = ({ playerId, onBack }) => {
         }
     }, [playerId, fetchProfile])
 
-    // Check if the user can change their name (once per week)
+    // Check if the user can change their name (no longer limited)
     const canChangeName = () => {
-        if (!player?.display_name_updated_at) return true
-        const lastUpdate = new Date(player.display_name_updated_at)
-        const now = new Date()
-        const weekInMs = 7 * 24 * 60 * 60 * 1000
-        return (now - lastUpdate) >= weekInMs
+        return true // Removed 7-day limitation
     }
 
-    // Get days until next name change
+    // Get days until next name change (no longer needed)
     const getDaysUntilNextChange = () => {
-        if (!player?.display_name_updated_at) return 0
-        const lastUpdate = new Date(player.display_name_updated_at)
-        const now = new Date()
-        const weekInMs = 7 * 24 * 60 * 60 * 1000
-        const timePassed = now - lastUpdate
-        const remaining = weekInMs - timePassed
-        return Math.ceil(remaining / (24 * 60 * 60 * 1000))
+        return 0 // No limitation
     }
+
 
     // Handle name save
     const handleSaveName = async () => {
@@ -336,16 +327,19 @@ const ProfilePage = ({ playerId, onBack }) => {
                     <div className="grid grid-cols-3 gap-3">
                         {(() => {
                             const games = stats?.total_games || 0
+                            const matches = stats?.total_matches || 0
                             const wins = stats?.total_wins || 0
                             const winRate = hasEnoughGames(stats) ? ((wins / games) * 100).toFixed(1) : '-'
                             return [
+                                { value: matches, label: '總場數' },
                                 { value: games, label: '總局數' },
                                 { value: wins, label: '勝利' },
-                                { value: stats?.total_zimo || 0, label: '自摸' },
                                 { value: `${winRate}%`, label: '勝率' },
                                 { value: stats?.total_deal_ins || 0, label: '放銃' },
                                 { value: stats?.total_bao || 0, label: '包牌' },
                             ]
+
+
                         })().map((stat, i) => (
                             <div
                                 key={i}
