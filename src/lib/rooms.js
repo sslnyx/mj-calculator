@@ -546,53 +546,28 @@ export const endGame = async (roomId) => {
 
 // Subscribe to room changes (real-time)
 export const subscribeToRoom = (roomId, callback) => {
-    const channels = []
-
-    // 1. Room Players channel
-    const playersChannel = supabase
-        .channel(`room_players:${roomId}`)
+    // Single channel for all room-related changes is more stable
+    // and avoids binding mismatches if handled carefully.
+    const channel = supabase
+        .channel(`room_all:${roomId}`)
         .on('postgres_changes', {
             event: '*',
             schema: 'public',
             table: 'room_players',
             filter: `room_id=eq.${roomId}`
         }, callback)
-        .subscribe((status) => {
-            console.log(`[Realtime] Players channel: ${status}`)
-        })
-    channels.push(playersChannel)
-
-    // 2. Game Room channel
-    const roomChannel = supabase
-        .channel(`game_room:${roomId}`)
         .on('postgres_changes', {
             event: '*',
             schema: 'public',
             table: 'game_rooms',
             filter: `id=eq.${roomId}`
         }, callback)
-        .subscribe((status) => {
-            console.log(`[Realtime] Room channel: ${status}`)
-        })
-    channels.push(roomChannel)
-
-    // 3. Game Rounds channel
-    const roundsChannel = supabase
-        .channel(`game_rounds:${roomId}`)
         .on('postgres_changes', {
             event: '*',
             schema: 'public',
             table: 'game_rounds',
             filter: `room_id=eq.${roomId}`
         }, callback)
-        .subscribe((status) => {
-            console.log(`[Realtime] Rounds channel: ${status}`)
-        })
-    channels.push(roundsChannel)
-
-    // 4. Vacated Seats channel
-    const vacatedChannel = supabase
-        .channel(`vacated_seats:${roomId}`)
         .on('postgres_changes', {
             event: '*',
             schema: 'public',
@@ -600,18 +575,15 @@ export const subscribeToRoom = (roomId, callback) => {
             filter: `room_id=eq.${roomId}`
         }, callback)
         .subscribe((status) => {
-            console.log(`[Realtime] Vacated channel: ${status}`)
+            console.log(`[Realtime] Room Channel Status (${roomId}): ${status}`)
         })
-    channels.push(vacatedChannel)
 
-    return channels
+    return channel
 }
 
 // Unsubscribe from room
-export const unsubscribeFromRoom = (channels) => {
-    if (Array.isArray(channels)) {
-        channels.forEach(ch => supabase.removeChannel(ch))
-    } else if (channels) {
-        supabase.removeChannel(channels)
+export const unsubscribeFromRoom = (channel) => {
+    if (channel) {
+        supabase.removeChannel(channel)
     }
 }

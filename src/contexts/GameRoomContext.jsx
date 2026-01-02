@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { calculateScoreTotals } from '../lib/scoring'
 import {
@@ -126,13 +126,33 @@ export const GameRoomProvider = ({ roomCode, children }) => {
         }
     }, [refreshData])
 
+    // Use a ref for the latest refresh timer to handle debouncing
+    const refreshTimerRef = useRef(null)
+
+    // Debounced refresh (prevents multiple rapid triggers from overwhelming the server)
+    const debouncedRefresh = useCallback(() => {
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = setTimeout(() => {
+            console.log('[Realtime] Executing debounced refresh...')
+            refreshData()
+        }, 500)
+    }, [refreshData])
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+        }
+    }, [])
+
     useEffect(() => {
         let channel = null
-        let roundsChannel = null
+        let active = true // Lifecycle flag
 
         const init = async () => {
+            console.log(`[Lifecycle] Initializing and subscribing to room: ${roomCode}`)
             const roomData = await fetchRoom()
-            if (!roomData) return
+            if (!active || !roomData) return
 
             // Fetch initial data
             await Promise.all([
@@ -140,22 +160,27 @@ export const GameRoomProvider = ({ roomCode, children }) => {
                 fetchVacated(roomData.id)
             ])
 
-            // Subscribe to all room-related changes (players, rooms, rounds, vacated)
-            // One channel for everything avoids binding mismatches
-            channel = subscribeToRoom(roomData.id, async () => {
-                console.log('Room data changed, refreshing...')
-                refreshData()
+            if (!active) return
+
+            // Subscribe to all room-related changes
+            channel = subscribeToRoom(roomData.id, () => {
+                if (active) {
+                    console.log('[Realtime] Event received, triggering refresh...')
+                    debouncedRefresh()
+                }
             })
         }
 
         init()
 
         return () => {
+            console.log(`[Lifecycle] Cleaning up and unsubscribing from room: ${roomCode}`)
+            active = false
             if (channel) {
                 unsubscribeFromRoom(channel)
             }
         }
-    }, [roomCode, fetchRoom, fetchRounds])
+    }, [roomCode, fetchRoom, fetchRounds, debouncedRefresh])
 
     const value = {
         // State

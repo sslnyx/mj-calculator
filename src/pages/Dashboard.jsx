@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { createRoom, joinRoom as joinTableService, joinAsSpectator, endGame } from '../lib/rooms'
@@ -85,7 +85,7 @@ const Dashboard = () => {
         return () => supabase.removeChannel(channel)
     }, [])
 
-    const handleCreateTable = async () => {
+    const handleCreateTable = useCallback(async () => {
         setError(null)
         setIsCreating(true)
         try {
@@ -96,9 +96,9 @@ const Dashboard = () => {
         } finally {
             setIsCreating(false)
         }
-    }
+    }, [player?.id])
 
-    const handleJoinTable = async (tableCode) => {
+    const handleJoinTable = useCallback(async (tableCode) => {
         setError(null)
         try {
             await joinTableService(tableCode, player.id)
@@ -106,7 +106,7 @@ const Dashboard = () => {
         } catch (err) {
             setError(err.message)
         }
-    }
+    }, [player?.id])
 
     const handleArchiveClick = (tableId) => {
         if (!isAdmin) return
@@ -136,10 +136,10 @@ const Dashboard = () => {
         }
     }
 
-    const handleLeaveTable = () => {
+    const handleLeaveTable = useCallback(() => {
         setCurrentTable(null)
         setError(null)
-    }
+    }, [])
 
     const handleDeleteClick = (tableId) => {
         if (!isAdmin) return
