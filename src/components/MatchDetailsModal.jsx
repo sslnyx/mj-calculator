@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { getFirstName } from '../lib/names'
 import { getPlayerAvatar } from '../lib/avatar'
+import { calculateRoundChanges } from '../lib/scoring'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Pagination } from 'swiper/modules'
 import 'swiper/css'
@@ -97,18 +98,75 @@ const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
         fetchData()
     }, [isOpen, match?.room?.id, match?.finalScores])
 
-    // Build player list from finalScores (sorted by seat)
+    // Build player list from finalScores and FULL rounds (recalculate for SSO)
     const players = useMemo(() => {
         if (!match?.finalScores) return []
-        return Object.entries(match.finalScores)
-            .map(([seat, data]) => ({
-                seat_position: parseInt(seat.replace('seat', '')),
-                player_id: data.player_id,
-                player_name: data.player_name,
-                points: data.points
-            }))
-            .sort((a, b) => a.seat_position - b.seat_position)
-    }, [match])
+
+        // 1. Start with known seats and players from finalScores
+        const seatMap = {}
+        const occupiedSeats = new Set()
+        const playerRecords = {} // seat_position -> { player_id, player_name }
+
+        Object.entries(match.finalScores).forEach(([seat, data]) => {
+            const seatNum = parseInt(seat.replace('seat', ''))
+            if (data.player_id) {
+                seatMap[data.player_id] = seatNum
+                occupiedSeats.add(seatNum)
+                playerRecords[seatNum] = {
+                    player_id: data.player_id,
+                    player_name: data.player_name
+                }
+            }
+        })
+
+        // 2. Augment map and records with missing players from rounds
+        if (fullRounds.length > 0) {
+            fullRounds.forEach(round => {
+                [
+                    { id: round.winner_id, info: round.winner },
+                    { id: round.loser_id, info: round.loser }
+                ].forEach(entry => {
+                    const pid = entry.id
+                    if (pid && !seatMap[pid]) {
+                        // Find first available seat
+                        const availableSeat = [1, 2, 3, 4].find(s => !occupiedSeats.has(s))
+                        if (availableSeat) {
+                            seatMap[pid] = availableSeat
+                            occupiedSeats.add(availableSeat)
+                            playerRecords[availableSeat] = {
+                                player_id: pid,
+                                player_name: entry.info?.display_name || '?'
+                            }
+                        }
+                    }
+                })
+            })
+        }
+
+        // 3. Recalculate totals from rounds
+        const totals = { 1: 0, 2: 0, 3: 0, 4: 0 }
+        if (fullRounds.length > 0) {
+            fullRounds.forEach(round => {
+                const changes = calculateRoundChanges(round, seatMap)
+                Object.keys(changes).forEach(s => {
+                    totals[s] += changes[s] || 0
+                })
+            })
+        } else {
+            // Use stored scores as temporary values
+            Object.keys(playerRecords).forEach(seatNum => {
+                totals[seatNum] = match.finalScores[`seat${seatNum}`]?.points || 0
+            })
+        }
+
+        // 4. Return complete list of 4 players (using placeholders for empty seats)
+        return [1, 2, 3, 4].map(seatNum => ({
+            seat_position: seatNum,
+            player_id: playerRecords[seatNum]?.player_id || null,
+            player_name: playerRecords[seatNum]?.player_name || null,
+            points: totals[seatNum] || 0
+        }))
+    }, [match, fullRounds])
 
     // Build player lookup for scoring
     const playerLookup = useMemo(() => {
@@ -126,34 +184,7 @@ const MatchDetailsModal = ({ isOpen, onClose, match, currentPlayerId }) => {
         if (!fullRounds.length) return []
 
         return fullRounds.map(round => {
-            const basePoints = round.points
-            const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
-            const winnerId = round.winner_id
-            const loserId = round.loser_id
-
-            const changes = { 1: 0, 2: 0, 3: 0, 4: 0 }
-
-            const winnerSeat = playerLookup[winnerId]
-            const loserSeat = playerLookup[loserId]
-
-            if (isZimo) {
-                const halfPoints = basePoints / 2
-                const winnerGain = halfPoints * 3
-
-                if (winnerSeat) changes[winnerSeat] = winnerGain
-
-                if (round.win_type === 'zimo_bao' && loserSeat) {
-                    changes[loserSeat] = -winnerGain
-                } else {
-                    [1, 2, 3, 4].forEach(seat => {
-                        if (seat !== winnerSeat) changes[seat] = -halfPoints
-                    })
-                }
-            } else {
-                if (winnerSeat) changes[winnerSeat] = basePoints
-                if (loserSeat) changes[loserSeat] = -basePoints
-            }
-
+            const changes = calculateRoundChanges(round, playerLookup)
             return { roundId: round.id, changes, fanCount: round.fan_count, winType: round.win_type }
         })
     }, [fullRounds, playerLookup])

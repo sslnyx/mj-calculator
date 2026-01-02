@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, Eye } from 'lucide-react'
 import { getPlayerAvatar } from '../lib/avatar'
 import { getFirstName } from '../lib/names'
 import MatchDetailsModal from '../components/MatchDetailsModal'
+import { calculateRoundChanges } from '../lib/scoring'
 
 const HistoryPage = ({ onBack }) => {
     const { player } = useAuth()
@@ -19,92 +20,138 @@ const HistoryPage = ({ onBack }) => {
         if (showRefresh) setRefreshing(true)
         else setLoading(true)
 
-        // Build query - either all games or just player's games
-        let query = supabase
-            .from('game_rounds')
-            .select(`
-                *,
-                room:game_rooms (id, room_code, status, created_at, ended_at, final_scores),
-                winner:players!winner_id (id, display_name, avatar_url, avatar_seed),
-                loser:players!loser_id (id, display_name, avatar_url, avatar_seed)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(100)
+        try {
+            let rounds = []
 
-        // Apply filter if myGamesOnly is true
-        if (myGamesOnly) {
-            query = query.or(`winner_id.eq.${player.id},loser_id.eq.${player.id}`)
-        }
+            if (myGamesOnly) {
+                // ROOM-FIRST STRATEGY: 
+                // 1. Find the most recent rooms where the player was winner or loser
+                const { data: myRecentRounds } = await supabase
+                    .from('game_rounds')
+                    .select('room_id')
+                    .or(`winner_id.eq.${player.id},loser_id.eq.${player.id}`)
+                    .order('created_at', { ascending: false })
+                    .limit(300)
 
-        const { data: rounds, error } = await query
+                if (myRecentRounds && myRecentRounds.length > 0) {
+                    // Extract unique room IDs
+                    const roomIds = [...new Set(myRecentRounds.map(r => r.room_id))].slice(0, 50)
 
-        if (!error && rounds) {
-            // Group rounds by room
-            const roomMap = new Map()
-            rounds.forEach(round => {
-                const roomId = round.room?.id
-                if (!roomId) return
+                    // 2. Fetch ALL rounds for these specific rooms to ensure zero-sum accuracy
+                    const { data: fullMatchRounds, error } = await supabase
+                        .from('game_rounds')
+                        .select(`
+                            *,
+                            room:game_rooms (id, room_code, status, created_at, ended_at, final_scores),
+                            winner:players!winner_id (id, display_name, avatar_url, avatar_seed),
+                            loser:players!loser_id (id, display_name, avatar_url, avatar_seed)
+                        `)
+                        .in('room_id', roomIds)
+                        .order('created_at', { ascending: false })
 
-                if (!roomMap.has(roomId)) {
-                    roomMap.set(roomId, {
-                        room: round.room,
-                        rounds: [],
-                        playerWins: 0,
-                        playerPoints: 0,
-                        finalScores: round.room?.final_scores || null,
-                        hasPlayer: false // Track if current player participated
-                    })
+                    if (!error) rounds = fullMatchRounds
                 }
+            } else {
+                // GLOBAL LOGIC: Just fetch the latest rounds across the server
+                const { data: globalRounds, error } = await supabase
+                    .from('game_rounds')
+                    .select(`
+                        *,
+                        room:game_rooms (id, room_code, status, created_at, ended_at, final_scores),
+                        winner:players!winner_id (id, display_name, avatar_url, avatar_seed),
+                        loser:players!loser_id (id, display_name, avatar_url, avatar_seed)
+                    `)
+                    .order('created_at', { ascending: false })
+                    .limit(300)
 
-                const roomData = roomMap.get(roomId)
-                roomData.rounds.push(round)
+                if (!error) rounds = globalRounds
+            }
 
-                // Check if player is in this round
-                if (round.winner_id === player.id || round.loser_id === player.id) {
-                    roomData.hasPlayer = true
-                }
+            if (rounds.length > 0) {
+                // Group rounds by room
+                const roomMap = new Map()
+                rounds.forEach(round => {
+                    const roomId = round.room?.id
+                    if (!roomId) return
 
-                // Count wins only (no duplicate calculation)
-                if (round.winner_id === player.id) {
-                    roomData.playerWins++
-                }
-            })
+                    if (!roomMap.has(roomId)) {
+                        roomMap.set(roomId, {
+                            room: round.room,
+                            rounds: [],
+                            playerWins: 0,
+                            playerPoints: 0,
+                            finalScores: round.room?.final_scores || null,
+                            hasPlayer: false
+                        })
+                    }
 
-            // Get player points from final_scores (for completed games)
-            // or calculate from rounds (for active games)
-            roomMap.forEach(roomData => {
-                if (roomData.finalScores) {
-                    // Use stored final_scores - find player's score
-                    const playerScore = Object.values(roomData.finalScores)
-                        .find(s => s.player_id === player.id)
-                    roomData.playerPoints = playerScore?.points || 0
-                } else {
-                    // Active game - calculate from rounds using same formula
+                    const roomData = roomMap.get(roomId)
+                    roomData.rounds.push(round)
+
+                    // Initial participation check
+                    if (round.winner_id === player.id || round.loser_id === player.id) {
+                        roomData.hasPlayer = true
+                    }
+                    if (round.winner_id === player.id) {
+                        roomData.playerWins++
+                    }
+                })
+
+                // Get player points by recalculating all rounds from SSO
+                roomMap.forEach(roomData => {
+                    const seatMap = {}
+                    const occupiedSeats = new Set()
+                    if (roomData.finalScores) {
+                        Object.entries(roomData.finalScores).forEach(([seat, data]) => {
+                            const seatNum = parseInt(seat.replace('seat', ''))
+                            if (data.player_id) {
+                                seatMap[data.player_id] = seatNum
+                                occupiedSeats.add(seatNum)
+                            }
+                        })
+                    }
+
                     roomData.rounds.forEach(round => {
-                        const basePoints = round.points
-                        const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
+                        [round.winner_id, round.loser_id].forEach(pid => {
+                            if (pid && !seatMap[pid]) {
+                                const availableSeat = [1, 2, 3, 4].find(s => !occupiedSeats.has(s))
+                                if (availableSeat) {
+                                    seatMap[pid] = availableSeat
+                                    occupiedSeats.add(availableSeat)
+                                }
+                            }
+                        })
+                    })
 
-                        if (round.winner_id === player.id) {
-                            roomData.playerPoints += isZimo ? (basePoints / 2) * 3 : basePoints
-                        } else if (round.loser_id === player.id) {
-                            roomData.playerPoints -= isZimo ? (basePoints / 2) * 3 : basePoints
-                        } else if (isZimo && round.win_type !== 'zimo_bao') {
-                            // Player is a non-bao loser in zimo
-                            roomData.playerPoints -= basePoints / 2
+                    let points = 0
+                    roomData.rounds.forEach(round => {
+                        const changes = calculateRoundChanges(round, seatMap)
+                        const seat = seatMap[player.id]
+                        if (seat) {
+                            points += changes[seat] || 0
+                            roomData.hasPlayer = true
                         }
                     })
+                    roomData.playerPoints = points
+                })
+
+                let matchList = Array.from(roomMap.values())
+                    .sort((a, b) => new Date(b.room.created_at) - new Date(a.room.created_at))
+
+                if (myGamesOnly) {
+                    matchList = matchList.filter(m => m.hasPlayer)
                 }
-            })
 
-            // Convert to array and sort by most recent
-            const matchList = Array.from(roomMap.values())
-                .sort((a, b) => new Date(b.room.created_at) - new Date(a.room.created_at))
-
-            setMatches(matchList)
+                setMatches(matchList)
+            } else {
+                setMatches([])
+            }
+        } catch (error) {
+            console.error('Error fetching history:', error)
+        } finally {
+            setLoading(false)
+            setRefreshing(false)
         }
-
-        setLoading(false)
-        setRefreshing(false)
     }
 
     useEffect(() => {
@@ -208,27 +255,82 @@ const HistoryPage = ({ onBack }) => {
                                     <div className="mt-3 pt-3 border-t-2 border-gray-300">
                                         <div className="text-sm font-bold text-gray-600 mb-2">🏆 最終成績</div>
                                         <div className="grid grid-cols-4 gap-2">
-                                            {Object.entries(match.finalScores)
-                                                .sort((a, b) => b[1].points - a[1].points) // Sort by points high to low
-                                                .map(([seat, data], idx) => (
-                                                    <div
-                                                        key={seat}
-                                                        className={`text-center p-2 rounded-lg border-2 ${data.player_id === player.id
-                                                            ? 'bg-yellow border-black'
-                                                            : idx === 0
-                                                                ? 'bg-orange/20 border-orange'
-                                                                : 'bg-gray-100 border-gray-300'
-                                                            }`}
-                                                    >
-                                                        <div className="text-xs font-bold text-gray-700 truncate">
-                                                            {getFirstName(data.player_name) || `P${seat.slice(-1)}`}
-                                                        </div>
-                                                        <div className={`font-title text-lg ${data.points >= 0 ? 'text-green-bold' : 'text-red-bold'
-                                                            }`}>
-                                                            {data.points >= 0 ? '+' : ''}{data.points}
-                                                        </div>
+                                            {(() => {
+                                                // 1. Build seat map and records from known final_scores
+                                                const seatMap = {}
+                                                const occupiedSeats = new Set()
+                                                const playerRecords = {} // seatNum -> { player_id, player_name }
+
+                                                if (match.finalScores) {
+                                                    Object.entries(match.finalScores).forEach(([seat, data]) => {
+                                                        const seatNum = parseInt(seat.replace('seat', ''))
+                                                        if (data.player_id) {
+                                                            seatMap[data.player_id] = seatNum
+                                                            occupiedSeats.add(seatNum)
+                                                            playerRecords[seatNum] = {
+                                                                player_id: data.player_id,
+                                                                player_name: data.player_name
+                                                            }
+                                                        }
+                                                    })
+                                                }
+
+                                                // 2. Augment map and records with missing players from rounds
+                                                match.rounds.forEach(round => {
+                                                    [
+                                                        { id: round.winner_id, info: round.winner },
+                                                        { id: round.loser_id, info: round.loser }
+                                                    ].forEach(entry => {
+                                                        if (entry.id && !seatMap[entry.id]) {
+                                                            const availableSeat = [1, 2, 3, 4].find(s => !occupiedSeats.has(s))
+                                                            if (availableSeat) {
+                                                                seatMap[entry.id] = availableSeat
+                                                                occupiedSeats.add(availableSeat)
+                                                                playerRecords[availableSeat] = {
+                                                                    player_id: entry.id,
+                                                                    player_name: entry.info?.display_name || '?'
+                                                                }
+                                                            }
+                                                        }
+                                                    })
+                                                })
+
+                                                // 3. Recalculate totals for all seats from rounds
+                                                const totals = { 1: 0, 2: 0, 3: 0, 4: 0 }
+                                                match.rounds.forEach(round => {
+                                                    const changes = calculateRoundChanges(round, seatMap)
+                                                    Object.keys(changes).forEach(s => {
+                                                        totals[s] += changes[s] || 0
+                                                    })
+                                                })
+
+                                                // 4. Return complete list for display
+                                                return [1, 2, 3, 4].map(seatNum => ({
+                                                    seat: `seat${seatNum}`,
+                                                    ...playerRecords[seatNum],
+                                                    points: totals[seatNum] || 0
+                                                }))
+                                                    .filter(p => p.player_id) // Only show seats that actually had a player
+                                                    .sort((a, b) => b.points - a.points)
+                                            })().map((data, idx) => (
+                                                <div
+                                                    key={data.seat}
+                                                    className={`text-center p-2 rounded-lg border-2 ${data.player_id === player.id
+                                                        ? 'bg-yellow border-black'
+                                                        : idx === 0
+                                                            ? 'bg-orange/20 border-orange'
+                                                            : 'bg-gray-100 border-gray-300'
+                                                        }`}
+                                                >
+                                                    <div className="text-xs font-bold text-gray-700 truncate">
+                                                        {getFirstName(data.player_name) || `P${data.seat.slice(-1)}`}
                                                     </div>
-                                                ))}
+                                                    <div className={`font-title text-lg ${data.points >= 0 ? 'text-green-bold' : 'text-red-bold'
+                                                        }`}>
+                                                        {data.points >= 0 ? '+' : ''}{data.points}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 )}

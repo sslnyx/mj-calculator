@@ -22,6 +22,7 @@ export const GameRoomProvider = ({ roomCode, children }) => {
     const [rounds, setRounds] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [vacatedSeats, setVacatedSeats] = useState([])
 
     // Derived state: players and spectators
     const allRoomPlayers = room?.room_players || []
@@ -34,10 +35,37 @@ export const GameRoomProvider = ({ roomCode, children }) => {
         [allRoomPlayers]
     )
 
+    // Calculate master seat map: player_id -> seat_position
+    // Includes active players, vacated players, and final scores
+    const masterSeatMap = useMemo(() => {
+        const map = {}
+
+        // 1. Start with final scores if completed
+        if (room?.final_scores) {
+            Object.values(room.final_scores).forEach(s => {
+                if (s.player_id) map[s.player_id] = s.seat_position || parseInt(s.seat?.replace('seat', ''))
+            })
+        }
+
+        // 2. Add vacated seats
+        vacatedSeats.forEach(vs => {
+            if (vs.player_id) map[vs.player_id] = vs.seat_position
+        })
+
+        // 3. Add active players (overrides if discrepancies exist)
+        allRoomPlayers.forEach(rp => {
+            if (rp.player_id && rp.seat_position) {
+                map[rp.player_id] = rp.seat_position
+            }
+        })
+
+        return map
+    }, [room, vacatedSeats, allRoomPlayers])
+
     // Calculate score totals from rounds (single source of truth)
     const scoreTotals = useMemo(() => {
-        return calculateScoreTotals(rounds, players)
-    }, [rounds, players])
+        return calculateScoreTotals(rounds, masterSeatMap)
+    }, [rounds, masterSeatMap])
 
     // Fetch rounds
     const fetchRounds = useCallback(async (roomId) => {
@@ -47,6 +75,15 @@ export const GameRoomProvider = ({ roomCode, children }) => {
             .eq('room_id', roomId)
             .order('created_at', { ascending: true })
         setRounds(data || [])
+    }, [])
+
+    // Fetch vacated seats
+    const fetchVacated = useCallback(async (roomId) => {
+        const { data } = await supabase
+            .from('vacated_seats')
+            .select('*')
+            .eq('room_id', roomId)
+        setVacatedSeats(data || [])
     }, [])
 
     // Fetch room data
@@ -67,9 +104,12 @@ export const GameRoomProvider = ({ roomCode, children }) => {
     const refreshData = useCallback(async () => {
         const roomData = await fetchRoom()
         if (roomData) {
-            await fetchRounds(roomData.id)
+            await Promise.all([
+                fetchRounds(roomData.id),
+                fetchVacated(roomData.id)
+            ])
         }
-    }, [fetchRoom, fetchRounds])
+    }, [fetchRoom, fetchRounds, fetchVacated])
 
     // Refresh when page becomes visible (handles mobile lock screen wake)
     useEffect(() => {
@@ -94,27 +134,18 @@ export const GameRoomProvider = ({ roomCode, children }) => {
             const roomData = await fetchRoom()
             if (!roomData) return
 
-            // Fetch initial rounds
-            await fetchRounds(roomData.id)
+            // Fetch initial data
+            await Promise.all([
+                fetchRounds(roomData.id),
+                fetchVacated(roomData.id)
+            ])
 
-            // Subscribe to room changes
+            // Subscribe to all room-related changes (players, rooms, rounds, vacated)
+            // One channel for everything avoids binding mismatches
             channel = subscribeToRoom(roomData.id, async () => {
-                const updated = await getRoomByCode(roomCode)
-                setRoom(updated)
+                console.log('Room data changed, refreshing...')
+                refreshData()
             })
-
-            // Subscribe to rounds changes
-            roundsChannel = supabase
-                .channel(`gameroom_rounds_${roomData.id}`)
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'game_rounds',
-                    filter: `room_id=eq.${roomData.id}`
-                }, () => {
-                    fetchRounds(roomData.id)
-                })
-                .subscribe()
         }
 
         init()
@@ -122,9 +153,6 @@ export const GameRoomProvider = ({ roomCode, children }) => {
         return () => {
             if (channel) {
                 unsubscribeFromRoom(channel)
-            }
-            if (roundsChannel) {
-                supabase.removeChannel(roundsChannel)
             }
         }
     }, [roomCode, fetchRoom, fetchRounds])
@@ -135,6 +163,8 @@ export const GameRoomProvider = ({ roomCode, children }) => {
         rounds,
         players,
         spectators,
+        vacatedSeats,
+        masterSeatMap,
         scoreTotals,
         loading,
         error,

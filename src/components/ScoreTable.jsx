@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useGameRoom } from '../contexts/GameRoomContext'
 import { Trash2 } from 'lucide-react'
+import { calculateRoundChanges } from '../lib/scoring'
 
 // ScoreTable uses GameRoomContext for rounds and scoreTotals (single source of truth)
 const ScoreTable = ({ onUpdate }) => {
-    const { room, rounds, players, scoreTotals } = useGameRoom()
+    const { room, rounds, players, vacatedSeats, masterSeatMap, scoreTotals } = useGameRoom()
     const [deleting, setDeleting] = useState(null)
 
     // Build player lookup for seat position
@@ -20,61 +21,38 @@ const ScoreTable = ({ onUpdate }) => {
     // Check if loading
     const loading = !room
 
-    // Get player name by ID (first name only, max 6 chars)
-    const getPlayerName = (playerId) => {
-        const player = players.find(p => p.player_id === playerId)
-        const name = player?.player?.display_name || '?'
-        const firstName = name.split(' ')[0]
-        return firstName.length > 6 ? firstName.substring(0, 6) : firstName
+    // Get seat information (who is/was in this seat)
+    const getSeatInfo = (seat) => {
+        const active = players.find(p => p.seat_position === seat)
+        if (active) return { ok: true, name: active.player?.display_name, id: active.player_id }
+
+        const vacated = vacatedSeats.find(vs => vs.seat_position === seat)
+        if (vacated) return { ok: true, name: vacated.player_name, id: vacated.player_id }
+
+        // Check final scores if available
+        if (room?.final_scores) {
+            const seatKey = `seat${seat}`
+            const final = room.final_scores[seatKey]
+            if (final) return { ok: true, name: final.player_name, id: final.player_id }
+        }
+
+        return { ok: false, name: `Seat ${seat}` }
     }
 
-    // Get seat position for a player
-    const getSeatForPlayer = (playerId) => {
-        return playerLookup[playerId]
+    const getPlayerName = (seat) => {
+        const info = getSeatInfo(seat)
+        const name = info.name || '?'
+        const firstName = name.split(' ')[0]
+        return firstName.length > 6 ? firstName.substring(0, 6) : firstName
     }
 
     // Calculate point changes for each round BY SEAT POSITION
     const roundPointChanges = useMemo(() => {
         return rounds.map(round => {
-            const basePoints = round.points
-            const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
-            const winnerId = round.winner_id
-            const loserId = round.loser_id
-
-            const changes = { 1: 0, 2: 0, 3: 0, 4: 0 }
-
-            const winnerSeat = getSeatForPlayer(winnerId)
-            const loserSeat = getSeatForPlayer(loserId)
-
-            if (isZimo) {
-                const halfPoints = basePoints / 2
-                const winnerGain = halfPoints * 3
-
-                if (winnerSeat) {
-                    changes[winnerSeat] = winnerGain
-                }
-
-                if (round.win_type === 'zimo_bao' && loserSeat) {
-                    changes[loserSeat] = -winnerGain
-                } else {
-                    [1, 2, 3, 4].forEach(seat => {
-                        if (seat !== winnerSeat) {
-                            changes[seat] = -halfPoints
-                        }
-                    })
-                }
-            } else {
-                if (winnerSeat) {
-                    changes[winnerSeat] = basePoints
-                }
-                if (loserSeat) {
-                    changes[loserSeat] = -basePoints
-                }
-            }
-
+            const changes = calculateRoundChanges(round, masterSeatMap)
             return { roundId: round.id, changes, fanCount: round.fan_count, winType: round.win_type }
         })
-    }, [rounds, playerLookup])
+    }, [rounds, masterSeatMap])
 
     // Handle delete round
     const handleDeleteRound = async (round) => {
@@ -113,13 +91,13 @@ const ScoreTable = ({ onUpdate }) => {
             <div className="shrink-0 bg-gradient-to-r from-purple-600 to-purple-500 px-2 py-3 rounded-t-lg">
                 <div className="flex items-center">
                     <div className="w-10 text-center text-xs font-bold text-black">#</div>
-                    {sortedPlayers.map(p => (
+                    {[1, 2, 3, 4].map(seat => (
                         <div
-                            key={p.player_id}
+                            key={seat}
                             className="flex-1 text-center"
                         >
                             <span className="font-bold truncate text-black">
-                                {getPlayerName(p.player_id)}
+                                {getPlayerName(seat)}
                             </span>
                         </div>
                     ))}
@@ -156,13 +134,13 @@ const ScoreTable = ({ onUpdate }) => {
                                     </div>
 
                                     {/* Point changes by seat */}
-                                    {sortedPlayers.map(p => {
-                                        const pts = changes?.[p.seat_position] || 0
+                                    {[1, 2, 3, 4].map(seat => {
+                                        const pts = changes?.[seat] || 0
                                         const isWinner = pts > 0
                                         const isLoser = pts < 0
                                         return (
                                             <div
-                                                key={p.player_id}
+                                                key={seat}
                                                 className="flex-1 text-center"
                                             >
                                                 <span className={`font-title text-lg inline-block min-w-[50px] py-1 rounded-md ${isWinner ? 'text-green-bold bg-green/10' :
@@ -203,11 +181,11 @@ const ScoreTable = ({ onUpdate }) => {
                         <div className="w-10 text-center">
                             <span className="text-white/50 text-xs font-bold">總計</span>
                         </div>
-                        {sortedPlayers.map(p => {
-                            const pts = scoreTotals[p.seat_position] || 0
+                        {[1, 2, 3, 4].map(seat => {
+                            const pts = scoreTotals[seat] || 0
                             return (
                                 <div
-                                    key={p.player_id}
+                                    key={seat}
                                     className="flex-1 text-center"
                                 >
                                     <span className={`font-title text-2xl ${pts > 0 ? 'text-green' :

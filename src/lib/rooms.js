@@ -578,6 +578,16 @@ export const subscribeToRoom = (roomId, callback) => {
             },
             callback
         )
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'vacated_seats',
+                filter: `room_id=eq.${roomId}`
+            },
+            callback
+        )
         .subscribe((status, err) => {
             if (err) {
                 console.error('[Realtime] Subscription error:', err)
