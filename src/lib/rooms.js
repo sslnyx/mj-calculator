@@ -603,6 +603,7 @@ export const deleteRoom = async (roomId) => {
         .from('room_players')
         .select('player_id')
         .eq('room_id', roomId)
+        .eq('is_spectator', false)
 
     const { data: vacatedSeats } = await supabase
         .from('vacated_seats')
@@ -632,7 +633,8 @@ export const deleteRoom = async (roomId) => {
         if (!stats) return
 
         // Calculate what to subtract
-        let gamesPlayed = 0
+        let roundsPlayed = 0
+        let matchesCount = 0
         let wins = 0
         let zimoWins = 0
         let eatWins = 0
@@ -651,6 +653,12 @@ export const deleteRoom = async (roomId) => {
             ...vacatedSeats?.map(vs => vs.player_id).filter(Boolean) || []
         ])
 
+        // Determine if player was in the room (non-spectator) to reverse total_matches
+        const wasInRoom = confirmedRosterIds.has(playerId)
+        if (wasInRoom) {
+            matchesCount = 1
+        }
+
         rounds?.forEach(round => {
             const isWinner = round.winner_id === playerId
             const isLoser = round.loser_id === playerId
@@ -660,7 +668,7 @@ export const deleteRoom = async (roomId) => {
             const wasInRosterForZimo = confirmedRosterIds.has(playerId)
 
             if (isWinner || isLoser || (round.win_type === 'zimo' && wasInRosterForZimo)) {
-                gamesPlayed += 1
+                roundsPlayed += 1
             }
 
             if (isWinner) {
@@ -700,7 +708,9 @@ export const deleteRoom = async (roomId) => {
 
 
         const updates = {
-            total_games: Math.max(0, (stats.total_games || 0) - gamesPlayed),
+            total_games: Math.max(0, (stats.total_games || 0) - roundsPlayed),
+            total_rounds_played: Math.max(0, (stats.total_rounds_played || 0) - roundsPlayed),
+            total_matches: Math.max(0, (stats.total_matches || 0) - matchesCount),
             total_wins: Math.max(0, (stats.total_wins || 0) - wins),
             total_zimo: Math.max(0, (stats.total_zimo || 0) - zimoWins),
             total_eat: Math.max(0, (stats.total_eat || 0) - eatWins),

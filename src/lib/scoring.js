@@ -127,13 +127,14 @@ const updateRoomStats = async ({
     try {
         // 1. Fetch all player stats in parallel
         const statsResults = await Promise.all(
-            roomPlayers.map(player =>
-                supabase
+            roomPlayers.map(player => {
+                if (player.is_spectator) return Promise.resolve({ data: null, error: null })
+                return supabase
                     .from('player_stats')
                     .select('*')
                     .eq('player_id', player.player_id)
                     .single()
-            )
+            })
         )
 
         // 2. Build update operations
@@ -141,6 +142,8 @@ const updateRoomStats = async ({
 
         roomPlayers.forEach((player, index) => {
             const pid = player.player_id
+            if (player.is_spectator) return // Skip spectators
+
             const { data: stats, error: fetchError } = statsResults[index]
 
             if (fetchError || !stats) {
@@ -591,7 +594,8 @@ export const deleteRound = async (round, roomId, roomPlayers, vacatedSeats = [])
 
 
     // 2. Reverse player_stats - fetch all in parallel
-    const validPlayers = allPlayers.filter(p => p.player_id)
+    // FILTER OUT SPECTATORS to avoid affecting their stats (e.g. total_rounds_played)
+    const validPlayers = allPlayers.filter(p => p.player_id && !p.is_spectator)
     const statsResults = await Promise.all(
         validPlayers.map(player =>
             supabase
