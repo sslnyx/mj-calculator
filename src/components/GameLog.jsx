@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useGameRoom } from '../contexts/GameRoomContext'
 import { getPointsForFan } from '../lib/scoring'
 
 const WINDS = ['East', 'South', 'West', 'North']
@@ -39,52 +40,18 @@ const PATTERN_NAMES = {
     hai_di_lao_yue: '海底撈月'
 }
 
-const GameLog = ({ roomId, players, onUpdate }) => {
-    const [rounds, setRounds] = useState([])
-    const [loading, setLoading] = useState(true)
+// GameLog now uses GameRoomContext for rounds (single source of truth)
+const GameLog = ({ onUpdate }) => {
+    const { room, rounds, players, refreshData } = useGameRoom()
     const [deleting, setDeleting] = useState(null)
 
-    // Fetch game rounds with winner/loser player details
-    useEffect(() => {
-        if (!roomId) return
+    // Get rounds in reverse order (newest first) for display
+    const displayRounds = useMemo(() => {
+        return [...rounds].reverse()
+    }, [rounds])
 
-        const fetchRounds = async () => {
-            setLoading(true)
-            const { data, error } = await supabase
-                .from('game_rounds')
-                .select(`
-                    *,
-                    winner:winner_id(id, display_name),
-                    loser:loser_id(id, display_name)
-                `)
-                .eq('room_id', roomId)
-                .order('created_at', { ascending: false })
-
-            if (!error && data) {
-                setRounds(data)
-            }
-            setLoading(false)
-        }
-
-        fetchRounds()
-
-        // Subscribe to changes
-        const channel = supabase
-            .channel(`game_rounds_${roomId}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'game_rounds',
-                filter: `room_id=eq.${roomId}`
-            }, () => {
-                fetchRounds()
-            })
-            .subscribe()
-
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [roomId])
+    // Check if loading
+    const loading = !room
 
     // Get player name by ID - uses round's joined data first, then room players
     const getPlayerName = (playerId, round = null) => {
@@ -244,7 +211,7 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                 return
             }
 
-            // Then reverse the points
+            // Then reverse the points in room_players (for DB consistency)
             const points = round.points
             const winType = round.win_type
             const winnerId = round.winner_id
@@ -263,14 +230,14 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                 await supabase
                     .from('room_players')
                     .update({ current_points: (winnerPlayer?.current_points || 0) - points })
-                    .eq('room_id', roomId)
+                    .eq('room_id', room.id)
                     .eq('player_id', winnerId)
 
                 if (loserPlayer) {
                     await supabase
                         .from('room_players')
                         .update({ current_points: (loserPlayer?.current_points || 0) + points })
-                        .eq('room_id', roomId)
+                        .eq('room_id', room.id)
                         .eq('player_id', loserId)
                 }
             } else if (winType === 'zimo' || winType === 'zimo_bao') {
@@ -280,14 +247,14 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                 await supabase
                     .from('room_players')
                     .update({ current_points: (winnerPlayer?.current_points || 0) - winnerPoints })
-                    .eq('room_id', roomId)
+                    .eq('room_id', room.id)
                     .eq('player_id', winnerId)
 
                 if (winType === 'zimo_bao' && loserPlayer) {
                     await supabase
                         .from('room_players')
                         .update({ current_points: (loserPlayer?.current_points || 0) + winnerPoints })
-                        .eq('room_id', roomId)
+                        .eq('room_id', room.id)
                         .eq('player_id', loserId)
                 } else {
                     for (const p of players) {
@@ -295,7 +262,7 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                             await supabase
                                 .from('room_players')
                                 .update({ current_points: (p.current_points || 0) + halfPoints })
-                                .eq('room_id', roomId)
+                                .eq('room_id', room.id)
                                 .eq('player_id', p.player_id)
                         }
                     }
@@ -373,8 +340,8 @@ const GameLog = ({ roomId, players, onUpdate }) => {
                     .eq('player_id', pid)
             }
 
-            // Update local state immediately
-            setRounds(prev => prev.filter(r => r.id !== round.id))
+            // Trigger refresh via context
+            await refreshData()
             onUpdate?.()
         } catch (err) {
             console.error('Delete round error:', err)
@@ -392,7 +359,7 @@ const GameLog = ({ roomId, players, onUpdate }) => {
         )
     }
 
-    if (rounds.length === 0) {
+    if (displayRounds.length === 0) {
         return (
             <div className="flex items-center justify-center h-full text-gray-500 font-bold">
                 No rounds recorded yet
@@ -402,11 +369,11 @@ const GameLog = ({ roomId, players, onUpdate }) => {
 
     return (
         <div className="h-full scroll-section flex flex-col gap-2">
-            {rounds.map((round, index) => {
+            {displayRounds.map((round, index) => {
                 const basePoints = round.points
                 const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
                 const winnerPoints = isZimo ? (basePoints / 2) * 3 : basePoints
-                const roundNum = rounds.length - index
+                const roundNum = displayRounds.length - index
 
                 return (
                     <div

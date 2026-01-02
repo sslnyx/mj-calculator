@@ -1,68 +1,24 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useGameRoom } from '../contexts/GameRoomContext'
 import { Trash2 } from 'lucide-react'
 
-const ScoreTable = ({ roomId, players, onUpdate }) => {
-    const [rounds, setRounds] = useState([])
-    const [loading, setLoading] = useState(true)
+// ScoreTable uses GameRoomContext for rounds and scoreTotals (single source of truth)
+const ScoreTable = ({ onUpdate }) => {
+    const { room, rounds, players, scoreTotals } = useGameRoom()
     const [deleting, setDeleting] = useState(null)
-    const [playerLookup, setPlayerLookup] = useState({}) // playerId -> seat at time of round
 
-    // Fetch game rounds with player-to-seat mapping
-    useEffect(() => {
-        if (!roomId) return
+    // Build player lookup for seat position
+    const playerLookup = useMemo(() => {
+        const lookup = {}
+        players.forEach(p => {
+            lookup[p.player_id] = p.seat_position
+        })
+        return lookup
+    }, [players])
 
-        const fetchRounds = async () => {
-            setLoading(true)
-
-            // Fetch rounds with winner/loser info
-            const { data, error } = await supabase
-                .from('game_rounds')
-                .select(`
-                    *,
-                    winner:winner_id(id, display_name),
-                    loser:loser_id(id, display_name)
-                `)
-                .eq('room_id', roomId)
-                .order('created_at', { ascending: true })
-
-            if (!error && data) {
-                setRounds(data)
-
-                // Build player lookup from current room_players
-                // This maps player_id -> seat_position for score calculation
-                const lookup = {}
-                players.forEach(p => {
-                    lookup[p.player_id] = p.seat_position
-                })
-
-                // Also include any players from rounds that are not in current room
-                // They get mapped to seat based on historical data
-                // For now, we'll use current seat mapping only - departed players won't show in columns
-                setPlayerLookup(lookup)
-            }
-            setLoading(false)
-        }
-
-        fetchRounds()
-
-        // Subscribe to changes
-        const channel = supabase
-            .channel(`score_table_${roomId}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'game_rounds',
-                filter: `room_id=eq.${roomId}`
-            }, () => {
-                fetchRounds()
-            })
-            .subscribe()
-
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [roomId, players])
+    // Check if loading
+    const loading = !room
 
     // Get player name by ID (first name only, max 6 chars)
     const getPlayerName = (playerId) => {
@@ -72,13 +28,12 @@ const ScoreTable = ({ roomId, players, onUpdate }) => {
         return firstName.length > 6 ? firstName.substring(0, 6) : firstName
     }
 
-    // Get seat position for a player (current or historical)
+    // Get seat position for a player
     const getSeatForPlayer = (playerId) => {
         return playerLookup[playerId]
     }
 
     // Calculate point changes for each round BY SEAT POSITION
-    // When player A leaves and player B takes seat 1, seat 1 inherits all scores
     const roundPointChanges = useMemo(() => {
         return rounds.map(round => {
             const basePoints = round.points
@@ -86,10 +41,8 @@ const ScoreTable = ({ roomId, players, onUpdate }) => {
             const winnerId = round.winner_id
             const loserId = round.loser_id
 
-            // Initialize changes by seat position (1-4)
             const changes = { 1: 0, 2: 0, 3: 0, 4: 0 }
 
-            // Get winner's seat (current mapping - if player left, this will be undefined)
             const winnerSeat = getSeatForPlayer(winnerId)
             const loserSeat = getSeatForPlayer(loserId)
 
@@ -104,7 +57,6 @@ const ScoreTable = ({ roomId, players, onUpdate }) => {
                 if (round.win_type === 'zimo_bao' && loserSeat) {
                     changes[loserSeat] = -winnerGain
                 } else {
-                    // Everyone else loses halfPoints
                     [1, 2, 3, 4].forEach(seat => {
                         if (seat !== winnerSeat) {
                             changes[seat] = -halfPoints
@@ -112,7 +64,6 @@ const ScoreTable = ({ roomId, players, onUpdate }) => {
                     })
                 }
             } else {
-                // Eat: winner gets base, loser loses base
                 if (winnerSeat) {
                     changes[winnerSeat] = basePoints
                 }
@@ -124,19 +75,6 @@ const ScoreTable = ({ roomId, players, onUpdate }) => {
             return { roundId: round.id, changes, fanCount: round.fan_count, winType: round.win_type }
         })
     }, [rounds, playerLookup])
-
-    // Calculate accumulated totals by seat
-    const totals = useMemo(() => {
-        const result = { 1: 0, 2: 0, 3: 0, 4: 0 }
-
-        roundPointChanges.forEach(({ changes }) => {
-            Object.entries(changes).forEach(([seat, pts]) => {
-                result[seat] += pts
-            })
-        })
-
-        return result
-    }, [roundPointChanges])
 
     // Handle delete round
     const handleDeleteRound = async (round) => {
@@ -266,7 +204,7 @@ const ScoreTable = ({ roomId, players, onUpdate }) => {
                             <span className="text-white/50 text-xs font-bold">總計</span>
                         </div>
                         {sortedPlayers.map(p => {
-                            const pts = totals[p.seat_position] || 0
+                            const pts = scoreTotals[p.seat_position] || 0
                             return (
                                 <div
                                     key={p.player_id}

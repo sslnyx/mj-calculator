@@ -167,13 +167,16 @@ const ProfilePage = ({ playerId, onBack }) => {
         const rounds = stats.total_games || 1
         const wins = stats.total_wins || 1
 
+        // Total games threshold for "validated" stats
+        const hasEnoughGames = (stats.total_games || 0) > 10
+
         // Speed: Win Rate (35% = 100%)
-        const winRate = ((stats.total_wins || 0) / rounds) * 100
-        const speed = Math.min(100, (winRate / 35) * 100)
+        const winRateVal = ((stats.total_wins || 0) / rounds) * 100
+        const speed = hasEnoughGames ? Math.min(100, (winRateVal / 35) * 100) : 0
 
         // Attack: Avg Fan (8 fan = 100%)
-        const avgFan = (stats.total_fan_value || 0) / wins
-        const attack = Math.min(100, (avgFan / 8) * 100)
+        const avgFanVal = (stats.total_fan_value || 0) / wins
+        const attack = hasEnoughGames ? Math.min(100, (avgFanVal / 8) * 100) : 0
 
         // Defense: Deal-in Avoidance (0% = 100%, 20% = 0%)
         const dealInRate = ((stats.total_deal_ins || 0) / rounds) * 100
@@ -387,7 +390,7 @@ const ProfilePage = ({ playerId, onBack }) => {
                         {(() => {
                             const games = stats?.total_games || 0
                             const wins = stats?.total_wins || 0
-                            const winRate = games > 0 ? ((wins / games) * 100).toFixed(1) : '0.0'
+                            const winRate = games > 10 ? ((wins / games) * 100).toFixed(1) : '-'
                             return [
                                 { value: games, label: '總局數' },
                                 { value: wins, label: '勝利' },
@@ -408,6 +411,51 @@ const ProfilePage = ({ playerId, onBack }) => {
                         ))}
                     </div>
                 </section>
+
+                {/* Limit Hands Section */}
+                {stats?.total_limit_hands > 0 && (
+                    <section className="mb-6">
+                        <h3 className="font-title text-lg mb-3 flex items-center gap-2">
+                            <span className="text-xl">🏆</span> 爆棚紀錄
+                            <span className="bg-red text-white text-sm font-bold px-2 py-0.5 rounded-full">
+                                {stats.total_limit_hands}
+                            </span>
+                        </h3>
+                        <div className="bg-gradient-to-r from-red/10 to-orange/10 border-comic-medium rounded-lg p-4 shadow-comic-sm">
+                            <div className="flex flex-wrap gap-2">
+                                {Object.entries(stats.hand_pattern_counts || {})
+                                    .filter(([patternId]) => {
+                                        // Limit hand patterns
+                                        const limitPatterns = [
+                                            'tian_hu', 'di_hu', 'shi_san_yao', 'jiu_lian_bao_deng',
+                                            'da_si_xi', 'xiao_si_xi', 'zi_yi_se', 'qing_yao_jiu',
+                                            'kan_kan_hu', 'shi_ba_luo_han', 'ba_xian_guo_hai', 'da_san_yuan'
+                                        ]
+                                        return limitPatterns.includes(patternId)
+                                    })
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([patternId, count]) => {
+                                        const patternNames = {
+                                            tian_hu: '天胡', di_hu: '地胡', shi_san_yao: '十三幺',
+                                            jiu_lian_bao_deng: '九蓮寶燈', da_si_xi: '大四喜',
+                                            xiao_si_xi: '小四喜', zi_yi_se: '字一色', qing_yao_jiu: '清么九',
+                                            kan_kan_hu: '坎坎胡', shi_ba_luo_han: '十八羅漢',
+                                            ba_xian_guo_hai: '八仙過海', da_san_yuan: '大三元'
+                                        }
+                                        return (
+                                            <div
+                                                key={patternId}
+                                                className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border-2 border-red/30"
+                                            >
+                                                <span className="font-bold text-sm text-red">{patternNames[patternId] || patternId}</span>
+                                                <span className="bg-red text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{count}</span>
+                                            </div>
+                                        )
+                                    })}
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 {/* Hand Pattern Records */}
                 {stats?.hand_pattern_counts && Object.keys(stats.hand_pattern_counts).length > 0 && (

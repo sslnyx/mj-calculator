@@ -25,8 +25,9 @@ export default {
         },
       },
       fontFamily: {
-        title: ['Bangers', 'cursive'],
-        body: ['Comic Neue', 'cursive'],
+        title: ['"Luckiest Guy"', 'cursive'],
+        body: ['"Comic Neue"', 'cursive'],
+        sans: ['"Outfit"', 'sans-serif'],
       },
       boxShadow: {
         'comic-sm': '2px 2px 0px 0px #000000',

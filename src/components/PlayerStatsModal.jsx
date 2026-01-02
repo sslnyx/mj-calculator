@@ -43,6 +43,7 @@ const PATTERN_NAMES = {
 const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
     const [player, setPlayer] = useState(null)
     const [stats, setStats] = useState(null)
+    const [limitRounds, setLimitRounds] = useState([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -68,8 +69,17 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
             .eq('player_id', playerId)
             .single()
 
+        // Fetch limit hand rounds (fan_count >= 10)
+        const { data: limitData } = await supabase
+            .from('game_rounds')
+            .select('id, fan_count, hand_patterns, win_type, points, created_at')
+            .eq('winner_id', playerId)
+            .gte('fan_count', 10)
+            .order('created_at', { ascending: false })
+
         setPlayer(playerData)
         setStats(statsData)
+        setLimitRounds(limitData || [])
         setLoading(false)
     }
 
@@ -80,13 +90,16 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
         const rounds = stats.total_games || 1
         const wins = stats.total_wins || 1
 
+        // Total games threshold for "validated" stats
+        const hasEnoughGames = (stats.total_games || 0) > 10
+
         // Speed: Win Rate (35% = 100%)
-        const winRate = ((stats.total_wins || 0) / rounds) * 100
-        const speed = Math.min(100, (winRate / 35) * 100)
+        const winRateVal = ((stats.total_wins || 0) / rounds) * 100
+        const speed = hasEnoughGames ? Math.min(100, (winRateVal / 35) * 100) : 0
 
         // Attack: Avg Fan (8 fan = 100%)
-        const avgFan = (stats.total_fan_value || 0) / wins
-        const attack = Math.min(100, (avgFan / 8) * 100)
+        const avgFanVal = (stats.total_fan_value || 0) / wins
+        const attack = hasEnoughGames ? Math.min(100, (avgFanVal / 8) * 100) : 0
 
         // Defense: Deal-in Avoidance (0% = 100%, 20% = 0%)
         const dealInRate = ((stats.total_deal_ins || 0) / rounds) * 100
@@ -191,7 +204,7 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
                                 {(() => {
                                     const games = stats?.total_games || 0
                                     const wins = stats?.total_wins || 0
-                                    const winRate = games > 0 ? ((wins / games) * 100).toFixed(1) : '0.0'
+                                    const winRate = games > 10 ? ((wins / games) * 100).toFixed(1) : '-'
                                     return [
                                         { value: games, label: '總局數' },
                                         { value: wins, label: '勝利' },
@@ -213,6 +226,42 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
                             </div>
                         </section>
 
+                        {/* Limit Hands Section */}
+                        {limitRounds.length > 0 && (
+                            <section className="mb-4">
+                                <h3 className="font-title text-sm mb-2 flex items-center gap-1">
+                                    <span>🏆</span> 爆棚紀錄
+                                    <span className="bg-red text-white text-xs font-bold px-2 py-0.5 rounded-full ml-1">
+                                        {limitRounds.length}
+                                    </span>
+                                </h3>
+                                <div className="bg-gradient-to-r from-red/10 to-orange/10 border-comic-thin rounded-lg p-3">
+                                    <div className="flex flex-col gap-2">
+                                        {limitRounds.map((round, idx) => (
+                                            <div
+                                                key={round.id}
+                                                className="flex items-center gap-2 bg-white p-2 rounded-lg border border-red/20"
+                                            >
+                                                <span className="bg-red text-white text-xs font-bold px-2 py-1 rounded shrink-0">
+                                                    {round.fan_count}番
+                                                </span>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {(round.hand_patterns || []).map((patternId, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className="text-xs font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded"
+                                                        >
+                                                            {PATTERN_NAMES[patternId] || patternId}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
                         {/* Hand Pattern Records */}
                         {stats?.hand_pattern_counts && Object.keys(stats.hand_pattern_counts).length > 0 && (
                             <section>
@@ -223,7 +272,6 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
                                     <div className="flex flex-wrap gap-1.5">
                                         {Object.entries(stats.hand_pattern_counts)
                                             .sort((a, b) => b[1] - a[1])
-                                            .slice(0, 8) // Show top 8 patterns
                                             .map(([patternId, count]) => (
                                                 <div
                                                     key={patternId}

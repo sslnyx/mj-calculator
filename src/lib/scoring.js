@@ -23,6 +23,60 @@ export const getPointsForFan = (fan) => {
     return FAN_POINTS[fan] || 0
 }
 
+/**
+ * Calculate score totals from game rounds - SINGLE SOURCE OF TRUTH
+ * @param {Array} rounds - Array of game_rounds records
+ * @param {Array} players - Array of room_players with player_id and seat_position
+ * @returns {Object} - { [seat_position]: total_points }
+ */
+export const calculateScoreTotals = (rounds, players) => {
+    // Build seat lookup: player_id -> seat_position
+    const seatMap = {}
+    players.forEach(p => {
+        seatMap[p.player_id] = p.seat_position
+    })
+
+    // Initialize totals by seat position
+    const totals = { 1: 0, 2: 0, 3: 0, 4: 0 }
+
+    rounds.forEach(round => {
+        const basePoints = round.points
+        const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
+        const winnerSeat = seatMap[round.winner_id]
+        const loserSeat = seatMap[round.loser_id]
+
+        if (isZimo) {
+            const halfPoints = basePoints / 2
+            const winnerGain = halfPoints * 3
+
+            if (winnerSeat) {
+                totals[winnerSeat] += winnerGain
+            }
+
+            if (round.win_type === 'zimo_bao' && loserSeat) {
+                totals[loserSeat] -= winnerGain
+            } else {
+                // Standard zimo: everyone else pays half
+                [1, 2, 3, 4].forEach(seat => {
+                    if (seat !== winnerSeat) {
+                        totals[seat] -= halfPoints
+                    }
+                })
+            }
+        } else {
+            // Eat: winner gets base, loser loses base
+            if (winnerSeat) {
+                totals[winnerSeat] += basePoints
+            }
+            if (loserSeat) {
+                totals[loserSeat] -= basePoints
+            }
+        }
+    })
+
+    return totals
+}
+
 // Update stats for ALL players in a round (Hexagon Warrior Metrics)
 const updateRoomStats = async ({
     roomPlayers,

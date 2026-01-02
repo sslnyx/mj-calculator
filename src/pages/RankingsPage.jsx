@@ -54,22 +54,29 @@ const RankingsPage = ({ onBack }) => {
             '33333333-3333-3333-3333-333333333333'
         ]
 
-        // Filter out test players
-        const realPlayers = data.filter(s =>
-            !TEST_PLAYER_IDS.includes(s.player_id) &&
-            (s.total_games || 0) > 0  // Hide players who never played
-        )
+        // Filter out test players and those with low game counts for winrate
+        const realPlayers = data.filter(s => {
+            const isTest = TEST_PLAYER_IDS.includes(s.player_id)
+            if (isTest) return false
+
+            const games = s.total_games || 0
+            if (activeTab === 'winrate' || activeTab === 'avgfan') {
+                return games > 10
+            }
+            return games > 0
+        })
 
         // Calculate derived values and sort
         const sorted = realPlayers
             .map(s => {
-                const rounds = s.total_games || 1
-                const wins = s.total_wins || 1
+                const rounds = s.total_games || 0
+                const wins = s.total_wins || 0
+                const hasEnoughGames = rounds > 10
                 return {
                     ...s,
                     netPoints: (s.total_points_won || 0) - (s.total_points_lost || 0),
-                    winRate: rounds > 0 ? ((s.total_wins || 0) / rounds * 100).toFixed(1) : 0,
-                    avgFan: wins > 0 ? ((s.total_fan_value || 0) / wins).toFixed(1) : 0,
+                    winRate: hasEnoughGames ? ((s.total_wins || 0) / rounds * 100).toFixed(1) : null,
+                    avgFan: hasEnoughGames && wins > 0 ? ((s.total_fan_value || 0) / wins).toFixed(1) : null,
                     limitCount: s.total_limit_hands || 0
                 }
             })
@@ -78,9 +85,9 @@ const RankingsPage = ({ onBack }) => {
                     case 'points':
                         return b.netPoints - a.netPoints
                     case 'winrate':
-                        return parseFloat(b.winRate) - parseFloat(a.winRate)
+                        return (parseFloat(b.winRate) || 0) - (parseFloat(a.winRate) || 0)
                     case 'avgfan':
-                        return parseFloat(b.avgFan) - parseFloat(a.avgFan)
+                        return (parseFloat(b.avgFan) || 0) - (parseFloat(a.avgFan) || 0)
                     case 'lucky':
                         return b.limitCount - a.limitCount
                     default:
@@ -100,9 +107,9 @@ const RankingsPage = ({ onBack }) => {
                         case 'points':
                             return player.netPoints === prevPlayer.netPoints
                         case 'winrate':
-                            return parseFloat(player.winRate) === parseFloat(prevPlayer.winRate)
+                            return player.winRate === prevPlayer.winRate
                         case 'avgfan':
-                            return parseFloat(player.avgFan) === parseFloat(prevPlayer.avgFan)
+                            return player.avgFan === prevPlayer.avgFan
                         case 'lucky':
                             return player.limitCount === prevPlayer.limitCount
                         default:
@@ -114,8 +121,6 @@ const RankingsPage = ({ onBack }) => {
             withRanks.push({ ...player, rank })
         }
 
-
-
         setPlayers(withRanks)
         setLoading(false)
     }
@@ -125,9 +130,9 @@ const RankingsPage = ({ onBack }) => {
             case 'points':
                 return `${player.netPoints >= 0 ? '+' : ''}${player.netPoints}`
             case 'winrate':
-                return `${player.winRate}%`
+                return player.winRate ? `${player.winRate}%` : '-'
             case 'avgfan':
-                return `${player.avgFan} 番`
+                return player.avgFan ? `${player.avgFan} 番` : '-'
             case 'lucky':
                 return `${player.limitCount} 次`
             default:

@@ -1,15 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { GameRoomProvider, useGameRoom } from '../contexts/GameRoomContext'
 import { supabase } from '../lib/supabase'
 import { getFirstName } from '../lib/names'
 import {
     getRoomByCode,
     startGame,
     endGame,
-    leaveRoom,
-    subscribeToRoom,
-    unsubscribeFromRoom,
-    joinRoom
+    leaveRoom
 } from '../lib/rooms'
 import HuModal from '../components/HuModal'
 import GameLog from '../components/GameLog'
@@ -30,11 +28,22 @@ const TEST_PLAYERS = [
     { id: '33333333-3333-3333-3333-333333333333', name: 'Player C' }
 ]
 
-const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
+// Inner component that uses the context
+const GameRoomContent = ({ roomCode, onLeave, onNavigate }) => {
     const { player } = useAuth()
-    const [room, setRoom] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(null)
+    const {
+        room,
+        rounds,
+        players,
+        spectators,
+        scoreTotals,
+        loading,
+        error,
+        refreshData,
+        setRoom,
+        setError
+    } = useGameRoom()
+
     const [showHuModal, setShowHuModal] = useState(false)
     const [showGuestModal, setShowGuestModal] = useState(false)
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
@@ -43,45 +52,12 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
 
     const isAdmin = player?.is_admin === true
 
-    // Fetch room data and subscribe to changes
-    useEffect(() => {
-        let channel = null
-
-        const fetchRoom = async () => {
-            try {
-                const roomData = await getRoomByCode(roomCode)
-                setRoom(roomData)
-                setLoading(false)
-
-                // Subscribe to real-time updates
-                channel = subscribeToRoom(roomData.id, async () => {
-                    const updatedRoom = await getRoomByCode(roomCode)
-                    setRoom(updatedRoom)
-                })
-            } catch (err) {
-                setError(err.message)
-                setLoading(false)
-            }
-        }
-
-        fetchRoom()
-
-        return () => {
-            if (channel) {
-                unsubscribeFromRoom(channel)
-            }
-        }
-    }, [roomCode])
-
     const handleStartGame = async () => {
         console.log('Starting game...', { roomId: room.id, playerId: player?.id, hostId: room.host_id })
         try {
             await startGame(room.id, player.id)
             console.log('Game started successfully')
-            // Force refresh room data to update UI immediately
-            const updatedRoom = await getRoomByCode(roomCode)
-            setRoom(updatedRoom)
-            // Navigate to Game Log slide
+            await refreshData()
             swiperRef.current?.slideTo(1)
         } catch (err) {
             console.error('Start game error:', err)
@@ -94,9 +70,7 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
         try {
             await endGame(room.id)
             console.log('Game ended successfully')
-            // Force refresh room data
-            const updatedRoom = await getRoomByCode(roomCode)
-            setRoom(updatedRoom)
+            await refreshData()
         } catch (err) {
             console.error('End game error:', err)
             setError(err.message)
@@ -104,11 +78,9 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
     }
 
     const handleLeaveRoom = async () => {
-        // Count real players (non-guests)
         const realPlayers = room.room_players.filter(rp => !rp.is_spectator && !rp.player?.is_guest)
         const isLastRealPlayer = realPlayers.length === 1 && realPlayers[0].player_id === player.id
 
-        // Show warning if last real player and game is active
         if (isLastRealPlayer && room.status === 'active') {
             setShowLeaveConfirm(true)
             return
@@ -128,12 +100,9 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
     }
 
     const handleHuSuccess = async () => {
-        // Refresh room data to get updated points
-        const updatedRoom = await getRoomByCode(roomCode)
-        setRoom(updatedRoom)
+        await refreshData()
     }
 
-    // Admin: Add test players to fill the table
     const handleAddTestPlayers = async () => {
         if (!isAdmin) return
 
@@ -156,12 +125,9 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                 })
         }
 
-        // Refresh room
-        const updatedRoom = await getRoomByCode(roomCode)
-        setRoom(updatedRoom)
+        await refreshData()
     }
 
-    // Add guest player to a seat
     const handleAddGuest = (seat) => {
         setSelectedSeat(seat)
         setShowGuestModal(true)
@@ -169,7 +135,6 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
 
     const handleGuestSelected = async (guest) => {
         try {
-            // Join the guest to the room at the selected seat
             await supabase
                 .from('room_players')
                 .insert({
@@ -179,9 +144,7 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                     current_points: 0
                 })
 
-            // Refresh room
-            const updatedRoom = await getRoomByCode(roomCode)
-            setRoom(updatedRoom)
+            await refreshData()
         } catch (err) {
             setError(err.message)
         }
@@ -210,9 +173,6 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
     }
 
     const isHost = room.host_id === player?.id
-    const allRoomPlayers = room.room_players || []
-    const players = allRoomPlayers.filter(rp => !rp.is_spectator)
-    const spectators = allRoomPlayers.filter(rp => rp.is_spectator)
     const sortedPlayers = [...players].sort((a, b) => a.seat_position - b.seat_position)
     const hasEmptySeats = players.length < 4
     const isSpectator = spectators.some(s => s.player_id === player?.id)
@@ -289,9 +249,9 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                                             <div className="font-bold text-sm truncate w-full">
                                                 {getFirstName(playerInSeat.player?.display_name) || 'Player'}
                                             </div>
-                                            <div className={`font-title text-xl ${playerInSeat.current_points >= 0 ? 'text-green' : 'text-red'
+                                            <div className={`font-title text-xl ${(scoreTotals[seat] || 0) >= 0 ? 'text-green' : 'text-red'
                                                 }`}>
-                                                {playerInSeat.current_points >= 0 ? '+' : ''}{playerInSeat.current_points}
+                                                {(scoreTotals[seat] || 0) >= 0 ? '+' : ''}{scoreTotals[seat] || 0}
                                             </div>
                                         </>
                                     ) : room.status === 'waiting' ? (
@@ -319,13 +279,8 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                 {/* Slide 2: Score Table */}
                 <SwiperSlide>
                     <section className="h-full flex flex-col p-4 pb-12">
-                        {/* <h3 className="font-title text-xl mb-3 shrink-0">SCORE TABLE</h3> */}
                         <div className="flex-1 min-h-0 bg-white border-comic-thin rounded-lg shadow-comic-sm overflow-hidden">
-                            <ScoreTable
-                                roomId={room.id}
-                                players={players}
-                                onUpdate={handleHuSuccess}
-                            />
+                            <ScoreTable onUpdate={handleHuSuccess} />
                         </div>
                     </section>
                 </SwiperSlide>
@@ -335,11 +290,7 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                     <section className="h-full flex flex-col p-4 pb-12">
                         <h3 className="font-title text-xl mb-3 shrink-0">GAME LOG</h3>
                         <div className="flex-1 overflow-hidden">
-                            <GameLog
-                                roomId={room.id}
-                                players={players}
-                                onUpdate={handleHuSuccess}
-                            />
+                            <GameLog onUpdate={handleHuSuccess} />
                         </div>
                     </section>
                 </SwiperSlide>
@@ -432,6 +383,15 @@ const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
                 onCancel={() => setShowLeaveConfirm(false)}
             />
         </div>
+    )
+}
+
+// Wrapper component that provides the context
+const GameRoom = ({ roomCode, onLeave, onNavigate }) => {
+    return (
+        <GameRoomProvider roomCode={roomCode}>
+            <GameRoomContent roomCode={roomCode} onLeave={onLeave} onNavigate={onNavigate} />
+        </GameRoomProvider>
     )
 }
 

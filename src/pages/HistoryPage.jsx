@@ -64,14 +64,35 @@ const HistoryPage = ({ onBack }) => {
                     roomData.hasPlayer = true
                 }
 
-                // Calculate player's performance
+                // Count wins only (no duplicate calculation)
                 if (round.winner_id === player.id) {
                     roomData.playerWins++
-                    const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
-                    roomData.playerPoints += isZimo ? (round.points / 2) * 3 : round.points
-                } else if (round.loser_id === player.id) {
-                    const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
-                    roomData.playerPoints -= isZimo ? (round.points / 2) * 3 : round.points
+                }
+            })
+
+            // Get player points from final_scores (for completed games)
+            // or calculate from rounds (for active games)
+            roomMap.forEach(roomData => {
+                if (roomData.finalScores) {
+                    // Use stored final_scores - find player's score
+                    const playerScore = Object.values(roomData.finalScores)
+                        .find(s => s.player_id === player.id)
+                    roomData.playerPoints = playerScore?.points || 0
+                } else {
+                    // Active game - calculate from rounds using same formula
+                    roomData.rounds.forEach(round => {
+                        const basePoints = round.points
+                        const isZimo = round.win_type === 'zimo' || round.win_type === 'zimo_bao'
+
+                        if (round.winner_id === player.id) {
+                            roomData.playerPoints += isZimo ? (basePoints / 2) * 3 : basePoints
+                        } else if (round.loser_id === player.id) {
+                            roomData.playerPoints -= isZimo ? (basePoints / 2) * 3 : basePoints
+                        } else if (isZimo && round.win_type !== 'zimo_bao') {
+                            // Player is a non-bao loser in zimo
+                            roomData.playerPoints -= basePoints / 2
+                        }
+                    })
                 }
             })
 
