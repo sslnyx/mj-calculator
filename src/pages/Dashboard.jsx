@@ -35,7 +35,7 @@ const Dashboard = () => {
                 .from('player_stats')
                 .select('*')
                 .eq('player_id', player.id)
-                .single()
+                .maybeSingle()
 
             if (data) setStats(data)
         }

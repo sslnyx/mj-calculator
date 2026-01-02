@@ -40,7 +40,7 @@ const ProfilePage = ({ playerId, onBack }) => {
             .from('player_stats')
             .select('*')
             .eq('player_id', playerId)
-            .single()
+            .maybeSingle()
 
         setPlayer(playerData)
         setStats(statsData)

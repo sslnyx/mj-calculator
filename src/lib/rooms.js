@@ -222,9 +222,10 @@ export const getRoomByCode = async (roomCode) => {
       )
     `)
         .eq('room_code', roomCode.toUpperCase())
-        .single()
+        .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Room not found')
     return data
 }
 
@@ -279,7 +280,7 @@ export const joinRoom = async (roomCode, playerId) => {
             .select('*')
             .eq('room_id', room.id)
             .eq('seat_position', emptySeat)
-            .single()
+            .maybeSingle()
 
         const inheritedPoints = vacatedSeat?.current_points || 0
 
@@ -412,14 +413,14 @@ export const leaveRoom = async (roomId, playerId) => {
         `)
         .eq('room_id', roomId)
         .eq('player_id', playerId)
-        .single()
+        .maybeSingle()
 
     // Check if the game is active
     const { data: roomData } = await supabase
         .from('game_rooms')
         .select('status')
         .eq('id', roomId)
-        .single()
+        .maybeSingle()
 
     // If game is active and player has a seat, save to vacated_seats with player info
     if (roomData?.status === 'active' && playerData?.seat_position) {
@@ -453,7 +454,7 @@ export const startGame = async (roomId, hostId) => {
         .from('game_rooms')
         .select('host_id, room_players(id)')
         .eq('id', roomId)
-        .single()
+        .maybeSingle()
 
     if (room.host_id !== hostId) {
         throw new Error('Only the host can start the game')
@@ -471,7 +472,7 @@ export const startGame = async (roomId, hostId) => {
         })
         .eq('id', roomId)
         .select()
-        .single()
+        .maybeSingle()
 
     if (error) throw error
     return data
@@ -538,7 +539,7 @@ export const endGame = async (roomId) => {
         })
         .eq('id', roomId)
         .select()
-        .single()
+        .maybeSingle()
 
     if (error) throw error
     return data

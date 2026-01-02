@@ -67,7 +67,7 @@ const PlayerStatsModal = ({ isOpen, onClose, playerId }) => {
             .from('player_stats')
             .select('*')
             .eq('player_id', playerId)
-            .single()
+            .maybeSingle()
 
         // Fetch limit hand rounds (fan_count >= 10)
         const { data: limitData } = await supabase
