@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
-import { supabase } from '../lib/supabase'
 import { useGameRoom } from '../contexts/GameRoomContext'
-import { getPointsForFan, getWinnerPoints, calculateRoundChanges } from '../lib/scoring'
+import { getPointsForFan, getWinnerPoints, calculateRoundChanges, deleteRound } from '../lib/scoring'
 import { getPatternName } from '../lib/patterns'
 
 const WINDS = ['East', 'South', 'West', 'North']
@@ -95,154 +94,13 @@ const GameLog = ({ onUpdate }) => {
         return result
     }, [rounds, masterSeatMap])
 
-    // Delete a round and reverse the points
+    // Delete a round using centralized function
     const handleDeleteRound = async (round) => {
         if (deleting) return
         setDeleting(round.id)
 
         try {
-            // First delete the round from database
-            const { error: deleteError } = await supabase
-                .from('game_rounds')
-                .delete()
-                .eq('id', round.id)
-
-            if (deleteError) {
-                console.error('Failed to delete round:', deleteError)
-                alert('Failed to delete round: ' + deleteError.message)
-                return
-            }
-
-            // Then reverse the points in room_players (for DB consistency)
-            const points = round.points
-            const winType = round.win_type
-            const winnerId = round.winner_id
-            const loserId = round.loser_id
-            const fanCount = round.fan_count || 0
-            const handPatterns = round.hand_patterns || []
-
-            const winnerPlayer = players.find(p => p.player_id === winnerId)
-            const loserPlayer = loserId ? players.find(p => p.player_id === loserId) : null
-
-            // Calculate actual winner points for stats reversal
-            const isZimo = winType === 'zimo' || winType === 'zimo_bao'
-            const actualWinnerPoints = getWinnerPoints(points, winType)
-
-            if (winType === 'eat') {
-                await supabase
-                    .from('room_players')
-                    .update({ current_points: (winnerPlayer?.current_points || 0) - points })
-                    .eq('room_id', room.id)
-                    .eq('player_id', winnerId)
-
-                if (loserPlayer) {
-                    await supabase
-                        .from('room_players')
-                        .update({ current_points: (loserPlayer?.current_points || 0) + points })
-                        .eq('room_id', room.id)
-                        .eq('player_id', loserId)
-                }
-            } else if (winType === 'zimo' || winType === 'zimo_bao') {
-                const halfPoints = points / 2
-                const winnerPoints = halfPoints * 3
-
-                await supabase
-                    .from('room_players')
-                    .update({ current_points: (winnerPlayer?.current_points || 0) - winnerPoints })
-                    .eq('room_id', room.id)
-                    .eq('player_id', winnerId)
-
-                if (winType === 'zimo_bao' && loserPlayer) {
-                    await supabase
-                        .from('room_players')
-                        .update({ current_points: (loserPlayer?.current_points || 0) + winnerPoints })
-                        .eq('room_id', room.id)
-                        .eq('player_id', loserId)
-                } else {
-                    for (const p of players) {
-                        if (p.player_id !== winnerId) {
-                            await supabase
-                                .from('room_players')
-                                .update({ current_points: (p.current_points || 0) + halfPoints })
-                                .eq('room_id', room.id)
-                                .eq('player_id', p.player_id)
-                        }
-                    }
-                }
-            }
-
-            // === REVERSE PLAYER STATS ===
-            // Reverse stats for all players in the room
-            for (const player of players) {
-                const pid = player.player_id
-
-                // Fetch current stats
-                const { data: stats } = await supabase
-                    .from('player_stats')
-                    .select('*')
-                    .eq('player_id', pid)
-                    .single()
-
-                if (!stats) continue
-
-                // Base update: everyone's round count decreases
-                const updates = {
-                    total_games: Math.max(0, (stats.total_games || 0) - 1)
-                }
-
-                // WINNER reversal
-                if (pid === winnerId) {
-                    updates.total_wins = Math.max(0, (stats.total_wins || 0) - 1)
-                    updates.total_points_won = Math.max(0, (stats.total_points_won || 0) - actualWinnerPoints)
-                    updates.total_fan_value = Math.max(0, (stats.total_fan_value || 0) - fanCount)
-
-                    if (isZimo) {
-                        updates.total_zimo = Math.max(0, (stats.total_zimo || 0) - 1)
-                    } else {
-                        updates.total_eat = Math.max(0, (stats.total_eat || 0) - 1)
-                    }
-
-                    if (fanCount >= 10) {
-                        updates.total_limit_hands = Math.max(0, (stats.total_limit_hands || 0) - 1)
-                    }
-
-                    // Reverse hand pattern counts
-                    if (handPatterns && handPatterns.length > 0) {
-                        const patternCounts = stats.hand_pattern_counts || {}
-                        handPatterns.forEach(patternId => {
-                            if (patternCounts[patternId]) {
-                                patternCounts[patternId] = Math.max(0, patternCounts[patternId] - 1)
-                                if (patternCounts[patternId] === 0) {
-                                    delete patternCounts[patternId]
-                                }
-                            }
-                        })
-                        updates.hand_pattern_counts = patternCounts
-                    }
-                }
-                // DEAL-IN LOSER reversal
-                else if (winType === 'eat' && pid === loserId) {
-                    updates.total_deal_ins = Math.max(0, (stats.total_deal_ins || 0) - 1)
-                    updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - points)
-                }
-                // BAO LOSER reversal
-                else if (winType === 'zimo_bao' && pid === loserId) {
-                    updates.total_bao = Math.max(0, (stats.total_bao || 0) - 1)
-                    updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - actualWinnerPoints)
-                }
-                // ZIMO LOSER reversal (everyone else)
-                else if (winType === 'zimo' && pid !== winnerId) {
-                    const share = actualWinnerPoints / 3
-                    updates.total_points_lost = Math.max(0, (stats.total_points_lost || 0) - share)
-                }
-
-                await supabase
-                    .from('player_stats')
-                    .update(updates)
-                    .eq('player_id', pid)
-            }
-
-            // Trigger refresh via context
+            await deleteRound(round, room.id, players, vacatedSeats)
             await refreshData()
             onUpdate?.()
         } catch (err) {

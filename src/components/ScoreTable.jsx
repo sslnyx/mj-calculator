@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react'
-import { supabase } from '../lib/supabase'
 import { useGameRoom } from '../contexts/GameRoomContext'
 import { Trash2 } from 'lucide-react'
-import { calculateRoundChanges } from '../lib/scoring'
+import { calculateRoundChanges, deleteRound } from '../lib/scoring'
 
 // ScoreTable uses GameRoomContext for rounds and scoreTotals (single source of truth)
 const ScoreTable = ({ onUpdate }) => {
@@ -54,18 +53,13 @@ const ScoreTable = ({ onUpdate }) => {
         })
     }, [rounds, masterSeatMap])
 
-    // Handle delete round
+    // Handle delete round using centralized function
     const handleDeleteRound = async (round) => {
         if (deleting) return
         setDeleting(round.id)
 
         try {
-            const { error } = await supabase
-                .from('game_rounds')
-                .delete()
-                .eq('id', round.id)
-
-            if (error) throw error
+            await deleteRound(round, room.id, players, vacatedSeats)
             onUpdate?.()
         } catch (err) {
             console.error('Delete round error:', err)

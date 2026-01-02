@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { getPointsForFan, getWinnerPoints } from '../lib/scoring'
+import { deleteRound } from '../lib/scoring'
 
 const GameHistory = ({ isOpen, onClose, roomId, players, onUpdate }) => {
     const [rounds, setRounds] = useState([])
@@ -35,75 +35,19 @@ const GameHistory = ({ isOpen, onClose, roomId, players, onUpdate }) => {
         return name.split(' ')[0] // First name only
     }
 
-    // Delete a round and reverse the points
+    // Delete a round using centralized function
     const handleDeleteRound = async (round) => {
         if (deleting) return
         setDeleting(round.id)
 
         try {
-            // Reverse the points
-            const points = round.points
-            const winType = round.win_type
-            const winnerId = round.winner_id
-            const loserId = round.loser_id
+            // Fetch vacated seats for this room
+            const { data: vacatedSeats } = await supabase
+                .from('vacated_seats')
+                .select('player_id, seat_position, current_points')
+                .eq('room_id', roomId)
 
-            // Get current player points
-            const winnerPlayer = players.find(p => p.player_id === winnerId)
-            const loserPlayer = loserId ? players.find(p => p.player_id === loserId) : null
-
-            // Calculate reversal amounts
-            if (winType === 'eat') {
-                // Direct win: winner loses points, loser gains back
-                await supabase
-                    .from('room_players')
-                    .update({ current_points: (winnerPlayer?.current_points || 0) - points })
-                    .eq('room_id', roomId)
-                    .eq('player_id', winnerId)
-
-                if (loserPlayer) {
-                    await supabase
-                        .from('room_players')
-                        .update({ current_points: (loserPlayer?.current_points || 0) + points })
-                        .eq('room_id', roomId)
-                        .eq('player_id', loserId)
-                }
-            } else if (winType === 'zimo' || winType === 'zimo_bao') {
-                const winnerPoints = getWinnerPoints(points, winType)
-                const halfPoints = points / 2
-
-                // Reverse winner points
-                await supabase
-                    .from('room_players')
-                    .update({ current_points: (winnerPlayer?.current_points || 0) - winnerPoints })
-                    .eq('room_id', roomId)
-                    .eq('player_id', winnerId)
-
-                if (winType === 'zimo_bao' && loserPlayer) {
-                    // Bao player gets points back
-                    await supabase
-                        .from('room_players')
-                        .update({ current_points: (loserPlayer?.current_points || 0) + winnerPoints })
-                        .eq('room_id', roomId)
-                        .eq('player_id', loserId)
-                } else {
-                    // All other players get back half points
-                    for (const p of players) {
-                        if (p.player_id !== winnerId) {
-                            await supabase
-                                .from('room_players')
-                                .update({ current_points: (p.current_points || 0) + halfPoints })
-                                .eq('room_id', roomId)
-                                .eq('player_id', p.player_id)
-                        }
-                    }
-                }
-            }
-
-            // Delete the round record
-            await supabase
-                .from('game_rounds')
-                .delete()
-                .eq('id', round.id)
+            await deleteRound(round, roomId, players, vacatedSeats || [])
 
             // Update local state
             setRounds(rounds.filter(r => r.id !== round.id))
