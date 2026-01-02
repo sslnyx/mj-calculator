@@ -71,7 +71,21 @@ export const GameRoomProvider = ({ roomCode, children }) => {
         }
     }, [fetchRoom, fetchRounds])
 
-    // Initialize: fetch room and subscribe to changes
+    // Refresh when page becomes visible (handles mobile lock screen wake)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('Page visible, refreshing room data...')
+                refreshData()
+            }
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+        }
+    }, [refreshData])
+
     useEffect(() => {
         let channel = null
         let roundsChannel = null
