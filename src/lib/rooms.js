@@ -706,7 +706,6 @@ export const deleteRoom = async (roomId) => {
             }
         })
 
-
         const updates = {
             total_games: Math.max(0, (stats.total_games || 0) - roundsPlayed),
             total_rounds_played: Math.max(0, (stats.total_rounds_played || 0) - roundsPlayed),
@@ -746,7 +745,9 @@ export const deleteRoom = async (roomId) => {
         if (statsUpdates.length > 0) {
             const results = await Promise.all(statsUpdates)
             results.forEach((res, idx) => {
-                if (res.error) console.error(`Error reversing stats for player ${playerIdArray[idx]}:`, res.error)
+                if (res.error) {
+                    console.error(`Error reversing stats for player ${playerIdArray[idx]}:`, res.error)
+                }
             })
         }
     } catch (err) {
@@ -755,6 +756,7 @@ export const deleteRoom = async (roomId) => {
     }
 
     // 4. Delete all game rounds for this room
+    console.log('[deleteRoom] Deleting game_rounds...')
     const { error: roundsError } = await supabase
         .from('game_rounds')
         .delete()

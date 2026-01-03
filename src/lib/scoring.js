@@ -161,11 +161,14 @@ const updateRoomStats = async ({
 
             // WINNER
             if (pid === winnerId) {
+                // NOTE: winnerPoints is already the correct amount for the winner
+                // For zimo: it's already (basePoints/2)*3
+                // For eat: it's already basePoints
+                // DO NOT recalculate here!
                 const isZimo = winType === 'zimo' || winType === 'zimo_bao'
-                const actualWinnerPoints = isZimo ? (winnerPoints / 2) * 3 : winnerPoints
 
                 updates.total_wins = (stats.total_wins || 0) + 1
-                updates.total_points_won = (stats.total_points_won || 0) + actualWinnerPoints
+                updates.total_points_won = (stats.total_points_won || 0) + winnerPoints
                 updates.total_fan_value = (stats.total_fan_value || 0) + fanCount
                 updates.highest_fan = Math.max(stats.highest_fan || 0, fanCount)
 
@@ -195,13 +198,13 @@ const updateRoomStats = async ({
             // BAO LOSER
             else if (winType === 'zimo_bao' && pid === loserId) {
                 updates.total_bao = (stats.total_bao || 0) + 1
-                const baoLoss = (winnerPoints / 2) * 3
-                updates.total_points_lost = (stats.total_points_lost || 0) + baoLoss
+                // For bao, loserPoints is passed as winnerPoints (the full amount)
+                updates.total_points_lost = (stats.total_points_lost || 0) + loserPoints
             }
-            // ZIMO LOSER
+            // ZIMO LOSER (each non-winner pays half of base points)
             else if (winType === 'zimo' && pid !== winnerId) {
-                const share = winnerPoints / 2
-                updates.total_points_lost = (stats.total_points_lost || 0) + share
+                // loserPoints is passed as basePoints/2 (the share each loser pays)
+                updates.total_points_lost = (stats.total_points_lost || 0) + loserPoints
             }
 
             updateOps.push(
@@ -487,7 +490,9 @@ export const recordZimo = async ({
             winType: baoPlayerId ? 'zimo_bao' : 'zimo',
             fanCount,
             winnerPoints,
-            loserPoints: winnerPoints,
+            // For zimo: each loser pays halfPoints (basePoints/2)
+            // For bao: the bao loser pays the full winnerPoints
+            loserPoints: baoPlayerId ? winnerPoints : halfPoints,
             handPatterns
         })
 
