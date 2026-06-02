@@ -84,6 +84,23 @@ A modern, multiplayer Mahjong score calculator built with React and Supabase. Tr
 
    The app will be available at `http://localhost:5173`
 
+### Supabase keep-alive cron
+
+Free Supabase projects can be paused after low activity. This repo includes a GitHub Actions cron that performs a small read-only REST query once per day.
+
+1. Add these GitHub repository secrets:
+   ```env
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your_anon_key
+   ```
+2. The scheduled workflow lives at `.github/workflows/supabase-keepalive.yml`.
+3. To test it locally:
+   ```bash
+   npm run keep:supabase-alive
+   ```
+
+By default, the script queries the public `fan_points` table with `limit=1`. To use another public read table, set `SUPABASE_KEEPALIVE_TABLE`.
+
 ## 📊 Database Schema
 
 ```
