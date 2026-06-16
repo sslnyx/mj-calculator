@@ -33,10 +33,14 @@ const endpoint = new URL(`/rest/v1/${encodeURIComponent(tableName)}`, projectUrl
 endpoint.searchParams.set('select', '*')
 endpoint.searchParams.set('limit', '1')
 
+const headers = {
+  apikey: supabaseAnonKey,
+  Authorization: `Bearer ${supabaseAnonKey}`,
+}
+
 const response = await fetch(endpoint, {
   headers: {
-    apikey: supabaseAnonKey,
-    Authorization: `Bearer ${supabaseAnonKey}`,
+    ...headers,
   },
 })
 
@@ -47,4 +51,24 @@ if (!response.ok) {
   process.exit(1)
 }
 
-console.log(`Supabase keep-alive succeeded for ${projectUrl.host} using table "${tableName}".`)
+const rpcEndpoint = new URL('/rest/v1/rpc/keepalive_ping', projectUrl)
+const rpcResponse = await fetch(rpcEndpoint, {
+  method: 'POST',
+  headers: {
+    ...headers,
+    'Content-Type': 'application/json',
+  },
+  body: '{}',
+})
+
+if (!rpcResponse.ok) {
+  const body = await rpcResponse.text()
+  console.error(`Supabase keep-alive RPC failed: ${rpcResponse.status} ${rpcResponse.statusText}`)
+  console.error(body)
+  process.exit(1)
+}
+
+const rpcBody = await rpcResponse.text()
+
+console.log(`Supabase keep-alive read succeeded for ${projectUrl.host} using table "${tableName}".`)
+console.log(`Supabase keep-alive write succeeded via keepalive_ping: ${rpcBody}`)
