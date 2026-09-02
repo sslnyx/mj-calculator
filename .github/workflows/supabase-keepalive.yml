@@ -44,8 +44,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          workflow_file="${GITHUB_WORKFLOW_REF##*/}"   # <file>.yml@refs/heads/<branch>
-          workflow_file="${workflow_file%%@*}"         # <file>.yml
+          # <owner>/<repo>/.github/workflows/<file>.yml@refs/heads/<branch>
+          # Strip the @ref first: it contains slashes, so taking the basename
+          # before stripping it yields the branch name instead of the file.
+          workflow_file="${GITHUB_WORKFLOW_REF%%@*}"
+          workflow_file="${workflow_file##*/}"
           echo "Re-enabling workflow: $workflow_file"
           gh api -X PUT \
             "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_file}/enable"
