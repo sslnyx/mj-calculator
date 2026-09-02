@@ -5,10 +5,14 @@ on:
     - cron: '17 */6 * * *'
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,3 +27,26 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+  # GitHub disables scheduled workflows in public repos after 60 days with no
+  # repository activity, which is what silently killed the pings in Aug 2026.
+  # Calling the enable endpoint on an already-enabled workflow resets that
+  # 60-day timer, so the schedule never expires again. Deliberately independent
+  # of `ping`: if the Supabase ping fails, the timer must still be reset.
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Reset the workflow inactivity timer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          workflow_file="${GITHUB_WORKFLOW_REF##*/}"   # <file>.yml@refs/heads/<branch>
+          workflow_file="${workflow_file%%@*}"         # <file>.yml
+          echo "Re-enabling workflow: $workflow_file"
+          gh api -X PUT \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_file}/enable"
+          echo "Inactivity timer reset."
